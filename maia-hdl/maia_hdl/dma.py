@@ -382,7 +382,7 @@ def gen_verilog():
                 ports=m.ports(),
                 emit_src=False))
     with open('dma_stream.v', 'w') as f:
-        m = DmaStreamWrite(0x03000000, 0x1a000000)
+        m = DmaStreamWrite(0x03000000, 0x16000000)
         f.write(
             amaranth.back.verilog.convert(
                 m,

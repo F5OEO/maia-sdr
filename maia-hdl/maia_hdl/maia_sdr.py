@@ -84,9 +84,9 @@ class MaiaSDR(Elaboratable):
             },
             1)
         self.spectrometer = Spectrometer(
-            0x1a00_0000, 3, dma_name='m_axi_spectrometer')
+            0x1600_0000, 3, dma_name='m_axi_spectrometer')
         self.recorder = Recorder16IQ(
-            0x0100_0000, 0x1a00_0000, dma_name='m_axi_recorder',
+            0x600_0000, 0x1600_0000, dma_name='m_axi_recorder',
             domain_in='sync', domain_dma='s_axi_lite')
         self.ddc = DDC('clk3x')
         self.sdr_registers = Registers(
