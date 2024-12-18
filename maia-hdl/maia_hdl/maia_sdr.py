@@ -223,6 +223,7 @@ class MaiaSDR(Elaboratable):
         self.re_in = Signal(self.iq_in_width)
         self.im_in = Signal(self.iq_in_width)
         self.interrupt_out = Signal()
+        self.fft_out = Signal()
 
     def ports(self):
         return (
@@ -240,6 +241,8 @@ class MaiaSDR(Elaboratable):
                 self.sync.rst,
                 self.clk2x.clk,
                 self.clk3x.clk,
+                self.fft_out,
+                
             ]
         )
 
@@ -255,6 +258,7 @@ class MaiaSDR(Elaboratable):
             self.clk2x,
             self.clk3x,
         ]
+        
         s_axi_lite_renamer = DomainRenamer({'sync': 's_axi_lite'})
         m.submodules.axi4lite = s_axi_lite_renamer(self.axi4lite)
         m.submodules.control_registers = s_axi_lite_renamer(
@@ -320,6 +324,7 @@ class MaiaSDR(Elaboratable):
                 self.sdr_registers['spectrometer']['peak_detect']),
             self.sdr_registers['spectrometer']['last_buffer'].eq(
                 self.spectrometer.last_buffer),
+            self.fft_out.eq(self.spectrometer.interrupt_out),
         ]
 
         # Recorder
