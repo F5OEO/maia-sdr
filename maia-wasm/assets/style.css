@@ -132,6 +132,7 @@ dialog[open]#settings {
     padding: 5px 15px;
     border-width: 0px;
     border-right-width: 1px;
+    min-width: 0px;
 }
 
 #settings_tabs button[aria-selected=true] {
@@ -335,8 +336,10 @@ input.decimation {
     column-gap: 10px;
 }
 
-#settings form div input:first-child {
+#settings form div input:first-child,
+#settings form div span:first-child {
     flex: 1;
+    min-width: 0px;
 }
 
 /* Recording panel */
@@ -357,4 +360,10 @@ input.decimation {
 
 #download_recording {
     grid-column: 4/5;
+}
+
+/* Geolocation panel */
+
+#geolocation_panel div {
+    grid-column: 1/3;
 }
