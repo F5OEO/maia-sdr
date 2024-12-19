@@ -115,7 +115,7 @@ impl Spectrometer {
             index += 1;
             z.to_ne_bytes().into_iter()
         })
-        .collect();
+        .collect()
     }
 }
 
