@@ -224,6 +224,7 @@ class MaiaSDR(Elaboratable):
         self.im_in = Signal(self.iq_in_width)
         self.interrupt_out = Signal()
         self.fft_out = Signal()
+        self.fastlock_profile = Signal(3)
 
     def ports(self):
         return (
@@ -242,7 +243,7 @@ class MaiaSDR(Elaboratable):
                 self.clk2x.clk,
                 self.clk3x.clk,
                 self.fft_out,
-                
+                self.fastlock_profile
             ]
         )
 
@@ -269,6 +270,7 @@ class MaiaSDR(Elaboratable):
         m.submodules.sync_spectrometer_interrupt = \
             sync_spectrometer_interrupt = PulseSynchronizer(
                 i_domain='sync', o_domain='s_axi_lite')
+        m.submodules.spectrometer.fastlock_profile = self.fastlock_profile        
         m.submodules.recorder = self.recorder
         m.submodules.ddc = self.ddc
         m.submodules.sdr_registers = self.sdr_registers
