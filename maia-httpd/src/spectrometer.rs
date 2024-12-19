@@ -100,16 +100,22 @@ impl Spectrometer {
 
         // TODO: optimize using Neon
         
-        buffer
-            .iter()
-            .flat_map(|&x| {
-                let exponent = (x >> 56) as u8;
-                let value = x & ((1u64 << 53) - 1);
-                let y = value << (2 * exponent);
-                let z = y as f32 * scale ;
-                z.to_ne_bytes().into_iter()
-            })
-            .collect()
+        let mut index = 0;
+    buffer
+        .iter()
+        .flat_map(|&x| {
+            let exponent = (x >> 56) as u8;
+            let value = x & ((1u64 << 53) - 1);
+            let y = value << (2 * exponent);
+            let z = if index == 0 { 
+                (x >> 53) as f32
+            } else { 
+                y as f32 * scale 
+            };
+            index += 1;
+            z.to_ne_bytes().into_iter()
+        })
+        .collect();
     }
 }
 
