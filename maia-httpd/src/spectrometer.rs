@@ -99,37 +99,17 @@ impl Spectrometer {
         // to shift left the mantissa by 2 times the exponent places.
 
         // TODO: optimize using Neon
-        /*
+        
         buffer
             .iter()
             .flat_map(|&x| {
                 let exponent = (x >> 56) as u8;
-                let value = x & ((1u64 << 56) - 1);
+                let value = x & ((1u64 << 53) - 1);
                 let y = value << (2 * exponent);
-                let z = y as f32 * scale;
+                let z = y as f32 * scale ;
                 z.to_ne_bytes().into_iter()
             })
             .collect()
-        */
-        let mut result: Vec<u8> = buffer
-        .iter()
-        .flat_map(|&x| {
-            let exponent = (x >> 56) as u8;
-            let value = x & ((1u64 << 53) - 1);
-            let y = value << (2 * exponent);
-            let z = y as f32 * scale;
-            z.to_ne_bytes().into_iter()
-        })
-        .collect();
-
-        // Ajouter les quatre premiers octets du premier élément du tableau d'entrée au vecteur
-        let index_fastlock = ( buffer[0] >> 53 ) as u8;
-        result.push(index_fastlock);
-        result.push(index_fastlock);
-        result.push(index_fastlock);
-        result.push(index_fastlock);
-    
-        Bytes::from(result)
     }
 }
 
