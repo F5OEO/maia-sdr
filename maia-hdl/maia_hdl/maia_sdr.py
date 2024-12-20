@@ -270,7 +270,7 @@ class MaiaSDR(Elaboratable):
         m.submodules.sync_spectrometer_interrupt = \
             sync_spectrometer_interrupt = PulseSynchronizer(
                 i_domain='sync', o_domain='s_axi_lite')
-        m.submodules.spectrometer.fastlock_profile = self.fastlock_profile        
+        #m.submodules.spectrometer.fastlock_profile = self.fastlock_profile        
         m.submodules.recorder = self.recorder
         m.submodules.ddc = self.ddc
         m.submodules.sdr_registers = self.sdr_registers
@@ -327,6 +327,7 @@ class MaiaSDR(Elaboratable):
             self.sdr_registers['spectrometer']['last_buffer'].eq(
                 self.spectrometer.last_buffer),
             self.fft_out.eq(self.spectrometer.interrupt_out),
+            self.spectrometer.fastlock_profile.eq(self.fastlock_profile),
         ]
 
         # Recorder
