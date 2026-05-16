@@ -43,7 +43,7 @@ jobs:
   bitstream:
     name: ${{ matrix.project }}
     needs: matrix-prep
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJSON(needs.matrix-prep.outputs.matrix) }}
       fail-fast: false
