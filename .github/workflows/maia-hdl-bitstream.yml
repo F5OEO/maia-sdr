@@ -75,9 +75,12 @@ jobs:
             ${{ env.VIVADO_IMAGE }} \
             bash -c '
               set -e
+              : > /etc/os-release
               apt-get update -qq
               apt-get install -y -qq python3-pip libpixman-1-0
               pip install -q amaranth amaranth-yosys numpy scipy
+              rm -f /lib/x86_64-linux-gnu/libudev.so.1.7.2 /lib/x86_64-linux-gnu/libudev.so.1
+              ldconfig 2>/dev/null || true
 
               source ${{ env.VIVADO_SETTINGS }}
 
