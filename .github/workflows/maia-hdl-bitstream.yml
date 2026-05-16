@@ -101,9 +101,4 @@ jobs:
           path: ${{ matrix.project }}.bin
           if-no-files-found: error
 
-      - name: Upload reports
-        uses: actions/upload-artifact@v7
-        with:
-          name: reports-${{ matrix.project }}
-          path: "*_${{ matrix.project }}.rpt"
-          if-no-files-found: warn
+      # - name: Upload reports (disabled — build.ci.tcl does not generate .rpt files)
