@@ -19,6 +19,29 @@
 ## Output: /work/${PROJECT_NAME}.bit + /work/${PROJECT_NAME}.bin
 ###############################################################################
 
+# ---- Phase 0: copy custom IPs into ADI library path ----
+# adi_project sets ip_repo_paths = $ad_hdl_dir/library only.
+# Custom IPs (maia-sdr, dvbs2rx, etc.) must live there to be found.
+set custom_ip_dir [file normalize "../ip"]
+set adi_lib [file normalize "../adi-hdl/library"]
+puts "=== Phase 0: copying custom IPs to ADI library ==="
+foreach ip_type [glob -nocomplain -dir $custom_ip_dir *] {
+    if {![file isdirectory $ip_type]} { continue }
+    foreach cfg [glob -nocomplain -dir $ip_type *] {
+        if {![file isdirectory $cfg]} { continue }
+        set comp_xml [file join $cfg component.xml]
+        if {[file exists $comp_xml]} {
+            set ip_name [file tail $cfg]
+            set dest [file join $adi_lib $ip_name]
+            if {![file exists $dest]} {
+                file copy -force $cfg $dest
+                puts "  copied $ip_name"
+            }
+        }
+    }
+}
+puts "=== Phase 0 complete ==="
+
 # ---- Phase 1: project creation (skip launch_runs) ----
 
 set env(ADI_SKIP_SYNTHESIS) 1

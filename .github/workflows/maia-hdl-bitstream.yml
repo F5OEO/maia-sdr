@@ -84,6 +84,9 @@ jobs:
               cd /work/maia-hdl/ip
               make
 
+              cd /work/maia-hdl/projects/tezuka
+              ADI_IGNORE_VERSION_CHECK=1 make lib
+
               cd /work/maia-hdl/projects
               PROJECT_NAME=${{ matrix.project }} vivado -mode batch -source ../ci/build.ci.tcl
             '

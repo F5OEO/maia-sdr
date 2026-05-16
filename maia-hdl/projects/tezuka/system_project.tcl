@@ -65,4 +65,6 @@ adi_project_files $project_name [list \
 set_property strategy Performance_ExplorePostRoutePhysOpt [get_runs impl_1]
 set_property is_enabled false [get_files  *system_sys_ps7_0.xdc]
 adi_project_run $project_name
-source $ad_hdl_dir/library/axi_ad9361/axi_ad9361_delay.tcl
+if {![info exists ::env(ADI_SKIP_SYNTHESIS)]} {
+    source $ad_hdl_dir/library/axi_ad9361/axi_ad9361_delay.tcl
+}
