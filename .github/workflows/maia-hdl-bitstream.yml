@@ -49,7 +49,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
 
@@ -95,14 +95,14 @@ jobs:
             '
 
       - name: Upload bitstream
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: bitstream-${{ matrix.project }}
           path: ${{ matrix.project }}.bin
           if-no-files-found: error
 
       - name: Upload reports
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: reports-${{ matrix.project }}
           path: "*_${{ matrix.project }}.rpt"
