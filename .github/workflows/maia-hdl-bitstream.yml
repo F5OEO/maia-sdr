@@ -76,7 +76,7 @@ jobs:
             bash -c '
               set -e
               apt-get update -qq
-              apt-get install -y -qq python3-pip
+              apt-get install -y -qq python3-pip libpixman-1-0
               pip install -q amaranth amaranth-yosys numpy scipy
 
               source ${{ env.VIVADO_SETTINGS }}
