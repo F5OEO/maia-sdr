@@ -10,13 +10,13 @@ permissions:
 on:
   push:
     branches: [main, develop, refactor]
-    paths: ['maia-hdl/**']
+    paths: ["maia-hdl/**"]
   workflow_dispatch:
     inputs:
       projects:
-        description: 'Space-separated project list (all if empty)'
+        description: "Space-separated project list (all if empty)"
         required: false
-        default: ''
+        default: ""
 
 env:
   VIVADO_IMAGE: xilinx-vivado:2025.2
@@ -88,7 +88,7 @@ jobs:
               ADI_IGNORE_VERSION_CHECK=1 make lib
 
               cd /work/maia-hdl/projects
-              PROJECT_NAME=${{ matrix.project }} vivado -mode batch -source ../ci/build.ci.tcl
+              MALLOC_CHECK_=0 PROJECT_NAME=${{ matrix.project }} vivado -mode batch -source ../ci/build.ci.tcl
             '
 
       - name: Upload bitstream
@@ -102,5 +102,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: reports-${{ matrix.project }}
-          path: '*_${{ matrix.project }}.rpt'
+          path: "*_${{ matrix.project }}.rpt"
           if-no-files-found: warn
