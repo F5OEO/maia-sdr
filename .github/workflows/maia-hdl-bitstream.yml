@@ -1,0 +1,111 @@
+name: maia-hdl bitstream
+
+concurrency:
+  group: bitstream-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+on:
+  push:
+    branches: [main, develop, refactor]
+    paths: ['maia-hdl/**']
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: 'Space-separated project list (all if empty)'
+        required: false
+        default: ''
+
+env:
+  VIVADO_VERSION: '2025.2'
+  VIVADO_IMAGE: ghcr.io/gretel/maia-sdr/vivado:2025.2
+  VIVADO_SETTINGS: /opt/Xilinx/2025.2/Vivado/settings64.sh
+  RELEASE_TAG: vivado-2025.2
+  RELEASE_REPO: gretel/maia-sdr
+
+jobs:
+  matrix-prep:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        run: |
+          ALL='["pluto","plutoplus","e200","e310","libre","fishball7010","fishball7020","signalsdrpro","plutoskyr2","nano"]'
+          if [ -z "${{ inputs.projects }}" ]; then
+            echo "matrix={\"project\":$ALL}" >> $GITHUB_OUTPUT
+          else
+            FILTERED=$(echo "${{ inputs.projects }}" | xargs -n1 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "matrix={\"project\":$FILTERED}" >> $GITHUB_OUTPUT
+          fi
+
+  bitstream:
+    name: ${{ matrix.project }}
+    needs: matrix-prep
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJSON(needs.matrix-prep.outputs.matrix) }}
+      fail-fast: false
+      max-parallel: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Free disk space on runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android /opt/hostedtoolcache
+          df -h / | tail -1
+
+      - name: Ensure Vivado image is available
+        run: |
+          # GHCR has a ~10 GB layer limit; our 57 GB layer can't push.
+          # Pull from GHCR if available, otherwise download from release.
+          docker pull ${{ env.VIVADO_IMAGE }} 2>/dev/null || {
+            echo "Downloading from release..."
+            gh release download ${{ env.RELEASE_TAG }} \
+              --repo ${{ env.RELEASE_REPO }} \
+              --pattern 'vivado-chunk-*'
+            cat vivado-chunk-* | docker load
+            rm -f vivado-chunk-*
+            docker tag xilinx-vivado:2025.2 ${{ env.VIVADO_IMAGE }}
+          }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build ${{ matrix.project }} bitstream
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/work \
+            ${{ env.VIVADO_IMAGE }} \
+            bash -c '
+              set -e
+              apt-get update -qq
+              apt-get install -y -qq python3-pip
+              pip install -q amaranth numpy scipy
+
+              source ${{ env.VIVADO_SETTINGS }}
+
+              cd /work/maia-hdl/ip
+              make
+
+              cd /work/maia-hdl/projects
+              PROJECT_NAME=${{ matrix.project }} vivado -mode batch -source ../ci/build.ci.tcl
+            '
+
+      - name: Upload bitstream
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitstream-${{ matrix.project }}
+          path: ${{ matrix.project }}.bin
+          if-no-files-found: error
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.project }}
+          path: '*_${{ matrix.project }}.rpt'
+          if-no-files-found: warn
