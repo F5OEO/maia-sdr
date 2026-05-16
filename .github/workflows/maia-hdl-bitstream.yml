@@ -2,7 +2,7 @@ name: maia-hdl bitstream
 
 concurrency:
   group: bitstream-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
