@@ -53,8 +53,14 @@ set project_name $::env(PROJECT_NAME)
 puts "=== CI: opening implemented design ==="
 open_run impl_1
 
+puts "=== generate reports ==="
+report_timing_summary -delay_type min_max -report_unconstrained -check_timing_verbose -max_paths 10 -input_pins -file /work/${project_name}_timing.rpt
+report_utilization -file /work/${project_name}_utilization.rpt
+report_power -file /work/${project_name}_power.rpt
+
 puts "=== write_bitstream ==="
 write_bitstream -force -bin_file /work/${project_name}
 
 puts "=== CI build complete: $project_name ==="
 puts "  Output: /work/${project_name}.bit /work/${project_name}.bin"
+puts "  Reports: /work/${project_name}_timing.rpt /work/${project_name}_utilization.rpt /work/${project_name}_power.rpt"
