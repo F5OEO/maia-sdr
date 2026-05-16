@@ -20,7 +20,7 @@ on:
 
 env:
   VIVADO_IMAGE: xilinx-vivado:2025.2
-  VIVADO_SETTINGS: /opt/Xilinx/2025.2/Vivado/settings64.sh
+  VIVADO_SETTINGS: /opt/Xilinx/2025.2/Vivado/.settings64-Vivado.sh
   RELEASE_TAG: vivado-2025.2
   RELEASE_REPO: gretel/maia-sdr
 
