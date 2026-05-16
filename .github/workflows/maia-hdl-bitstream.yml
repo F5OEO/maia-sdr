@@ -43,7 +43,7 @@ jobs:
   bitstream:
     name: ${{ matrix.project }}
     needs: matrix-prep
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix: ${{ fromJSON(needs.matrix-prep.outputs.matrix) }}
       fail-fast: false
@@ -54,15 +54,9 @@ jobs:
           submodules: true
 
       - name: Free disk space on runner
-        uses: jlumbroso/free-disk-space@v1
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: false
-          docker-images: false
-          swap-storage: false
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache /usr/share/dotnet /opt/ghc
+          df -h / | tail -1
 
       - name: Download Vivado image from release
         run: |
