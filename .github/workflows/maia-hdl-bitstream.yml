@@ -6,6 +6,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 on:
   push:
@@ -52,6 +53,13 @@ jobs:
         with:
           submodules: true
 
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/pip-docker
+          key: pip-vivado-${{ hashFiles('.github/workflows/maia-hdl-bitstream.yml') }}
+          restore-keys: pip-vivado-
+
       - name: Free disk space on runner
         run: |
           sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache /usr/share/dotnet /opt/ghc
@@ -72,6 +80,7 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/work \
             ${{ env.VIVADO_IMAGE }} \
+            -v /home/runner/.cache/pip-docker:/root/.cache/pip \
             bash -c '
               set -e
               : > /etc/os-release
@@ -109,3 +118,10 @@ jobs:
             ${{ matrix.project }}_utilization.rpt
             ${{ matrix.project }}_power.rpt
           if-no-files-found: warn
+
+      - name: Push Vivado image to GHCR
+        if: matrix.project == 'pluto'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag ${{ env.VIVADO_IMAGE }} ghcr.io/${{ github.repository }}/${{ env.VIVADO_IMAGE }}
+          docker push ghcr.io/${{ github.repository }}/${{ env.VIVADO_IMAGE }}
