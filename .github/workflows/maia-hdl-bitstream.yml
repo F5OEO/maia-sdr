@@ -79,8 +79,8 @@ jobs:
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/work \
-            ${{ env.VIVADO_IMAGE }} \
             -v /home/runner/.cache/pip-docker:/root/.cache/pip \
+            ${{ env.VIVADO_IMAGE }} \
             bash -c '
               set -e
               : > /etc/os-release
