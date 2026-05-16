@@ -95,14 +95,14 @@ jobs:
             '
 
       - name: Upload bitstream
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: bitstream-${{ matrix.project }}
           path: ${{ matrix.project }}.bin
           if-no-files-found: error
 
       - name: Upload reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: reports-${{ matrix.project }}
           path: "*_${{ matrix.project }}.rpt"
