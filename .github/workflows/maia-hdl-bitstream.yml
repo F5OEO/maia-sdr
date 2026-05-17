@@ -135,9 +135,4 @@ jobs:
             ${{ matrix.project }}_power.rpt
           if-no-files-found: warn
 
-      - name: Push Vivado image to GHCR
-        if: matrix.project == 'pluto'
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker tag ${{ env.VIVADO_IMAGE }} ghcr.io/${{ github.repository }}/${{ env.VIVADO_IMAGE }}
-          docker push ghcr.io/${{ github.repository }}/${{ env.VIVADO_IMAGE }}
+
