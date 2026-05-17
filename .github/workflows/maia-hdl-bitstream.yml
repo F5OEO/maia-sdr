@@ -110,19 +110,40 @@ jobs:
       - name: Print timing summary
         run: |
           RPT=${{ matrix.project }}_timing.rpt
-          WNS=$(grep -oP 'WNS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null || echo "N/A")
-          TNS=$(grep -oP 'TNS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null || echo "N/A")
-          WHS=$(grep -oP 'WHS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null || echo "N/A")
-          THS=$(grep -oP 'THS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null || echo "N/A")
+          # Parse timing table from .rpt (column 1 = WNS, 2 = TNS, 5 = WHS, 6 = THS)
+          if [ -f "$RPT" ]; then
+            vals=$(awk '/^\s*WNS\(ns\)/{for(i=0;i<2;i++){getline} print \$1, \$2, \$5, \$6}' "$RPT" 2>/dev/null | head -1)
+            WNS=$(echo "$vals" | cut -d' ' -f1)
+            TNS=$(echo "$vals" | cut -d' ' -f2)
+            WHS=$(echo "$vals" | cut -d' ' -f3)
+            THS=$(echo "$vals" | cut -d' ' -f4)
+          fi
+          # Fallback: grep Vivado log for WNS= pattern
+          if [ -z "$WNS" ] || [ "$WNS" = "0.000" ]; then
+            LOG=../${{ matrix.project }}_vivado.log
+            if [ ! -f "$LOG" ]; then LOG=/dev/null; fi
+            WNS=${WNS:-$(grep -oP "Post Routing Timing Summary .*? WNS=\K[+-]?[0-9.]+(?!.*WNS=)" "$LOG" 2>/dev/null | tail -1)}
+            TNS=${TNS:-$(grep -oP "Post Routing Timing Summary .*? TNS=\K[+-]?[0-9.]+(?!.*TNS=)" "$LOG" 2>/dev/null | tail -1)}
+            WHS=${WHS:-$(grep -oP "Post Routing Timing Summary .*? WHS=\K[+-]?[0-9.]+(?!.*WHS=)" "$LOG" 2>/dev/null | tail -1)}
+            THS=${THS:-$(grep -oP "Post Routing Timing Summary .*? THS=\K[+-]?[0-9.]+(?!.*THS=)" "$LOG" 2>/dev/null | tail -1)}
+          fi
           echo "### ${{ matrix.project }} Timing" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          [ "$WNS" != "N/A" ] && [ "$(echo "$WNS >= 0" | bc -l 2>/dev/null)" = 1 ] && S="✅" || S="❌"
-          echo "| Setup WNS | ${WNS}ns | $S |" >> $GITHUB_STEP_SUMMARY
-          [ "$WHS" != "N/A" ] && [ "$(echo "$WHS >= 0" | bc -l 2>/dev/null)" = 1 ] && H="✅" || H="⚠️"
-          echo "| Hold WHS | ${WHS}ns | $H |" >> $GITHUB_STEP_SUMMARY
-          echo "| TNS | ${TNS}ns | |" >> $GITHUB_STEP_SUMMARY
-          echo "| THS | ${THS}ns | |" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$WNS" ]; then
+            [ "$(echo "$WNS >= 0" | bc -l 2>/dev/null)" = 1 ] && S="✅" || S="❌"
+            echo "| Setup WNS | ${WNS}ns | $S |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Setup WNS | N/A | ❓ |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$WHS" ]; then
+            [ "$(echo "$WHS >= 0" | bc -l 2>/dev/null)" = 1 ] && H="✅" || H="⚠️"
+            echo "| Hold WHS | ${WHS}ns | $H |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Hold WHS | N/A | ❓ |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "| TNS | ${TNS:-N/A} | |" >> $GITHUB_STEP_SUMMARY
+          echo "| THS | ${THS:-N/A} | |" >> $GITHUB_STEP_SUMMARY
         if: always()
 
       - name: Upload reports
@@ -134,5 +155,3 @@ jobs:
             ${{ matrix.project }}_utilization.rpt
             ${{ matrix.project }}_power.rpt
           if-no-files-found: warn
-
-
