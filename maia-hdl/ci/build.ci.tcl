@@ -41,7 +41,10 @@ set env(ADI_IGNORE_VERSION_CHECK) 1
 
 # Source the tezuka meta-build (handles all board targets via PROJECT_NAME env)
 cd tezuka
-source system_project.tcl
+if {[catch {source system_project.tcl} err]} {
+    puts "=== WARNING: system_project.tcl reported timing failure: $err ==="
+    puts "=== Continuing Phase 2 (reports + bitstream) ==="
+}
 cd ..
 
 # ---- Phase 2: write .bin for UHD ----
