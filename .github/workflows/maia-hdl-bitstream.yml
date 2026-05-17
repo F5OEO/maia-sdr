@@ -110,22 +110,18 @@ jobs:
       - name: Print timing summary
         run: |
           RPT=${{ matrix.project }}_timing.rpt
-          # Parse timing table from .rpt (column 1 = WNS, 2 = TNS, 5 = WHS, 6 = THS)
           if [ -f "$RPT" ]; then
-            vals=$(awk '/^\s*WNS\(ns\)/{for(i=0;i<2;i++){getline} print \$1, \$2, \$5, \$6}' "$RPT" 2>/dev/null | head -1)
-            WNS=$(echo "$vals" | cut -d' ' -f1)
-            TNS=$(echo "$vals" | cut -d' ' -f2)
-            WHS=$(echo "$vals" | cut -d' ' -f3)
-            THS=$(echo "$vals" | cut -d' ' -f4)
+            DATA=$(grep -A3 'WNS(ns)' "$RPT" 2>/dev/null | tail -1)
+            WNS=$(echo "$DATA" | awk '{print $1}')
+            TNS=$(echo "$DATA" | awk '{print $2}')
+            WHS=$(echo "$DATA" | awk '{print $5}')
+            THS=$(echo "$DATA" | awk '{print $6}')
           fi
-          # Fallback: grep Vivado log for WNS= pattern
-          if [ -z "$WNS" ] || [ "$WNS" = "0.000" ]; then
-            LOG=../${{ matrix.project }}_vivado.log
-            if [ ! -f "$LOG" ]; then LOG=/dev/null; fi
-            WNS=${WNS:-$(grep -oP "Post Routing Timing Summary .*? WNS=\K[+-]?[0-9.]+(?!.*WNS=)" "$LOG" 2>/dev/null | tail -1)}
-            TNS=${TNS:-$(grep -oP "Post Routing Timing Summary .*? TNS=\K[+-]?[0-9.]+(?!.*TNS=)" "$LOG" 2>/dev/null | tail -1)}
-            WHS=${WHS:-$(grep -oP "Post Routing Timing Summary .*? WHS=\K[+-]?[0-9.]+(?!.*WHS=)" "$LOG" 2>/dev/null | tail -1)}
-            THS=${THS:-$(grep -oP "Post Routing Timing Summary .*? THS=\K[+-]?[0-9.]+(?!.*THS=)" "$LOG" 2>/dev/null | tail -1)}
+          if [ -z "$WNS" ]; then
+            WNS=$(grep -oP 'WNS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
+            TNS=$(grep -oP 'TNS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
+            WHS=$(grep -oP 'WHS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
+            THS=$(grep -oP 'THS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
           fi
           echo "### ${{ matrix.project }} Timing" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value | Status |" >> $GITHUB_STEP_SUMMARY
