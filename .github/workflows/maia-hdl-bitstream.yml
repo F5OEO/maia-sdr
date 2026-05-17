@@ -94,12 +94,36 @@ jobs:
               MALLOC_CHECK_=0 PROJECT_NAME=${{ matrix.project }} vivado -mode batch -source ../ci/build.ci.tcl
             '
 
+      - name: Copy XSA to predictable path
+        run: |
+          cp maia-hdl/projects/tezuka/${{ matrix.project }}.sdk/system_top*.xsa ./${{ matrix.project }}.xsa 2>/dev/null || true
+
       - name: Upload bitstream
         uses: actions/upload-artifact@v7
         with:
           name: bitstream-${{ matrix.project }}
-          path: ${{ matrix.project }}.bin
-          if-no-files-found: error
+          path: |
+            ${{ matrix.project }}.bin
+            ${{ matrix.project }}.xsa
+          if-no-files-found: warn
+
+      - name: Print timing summary
+        run: |
+          RPT=${{ matrix.project }}_timing.rpt
+          WNS=$(grep -oP 'WNS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null || echo "N/A")
+          TNS=$(grep -oP 'TNS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null || echo "N/A")
+          WHS=$(grep -oP 'WHS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null || echo "N/A")
+          THS=$(grep -oP 'THS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null || echo "N/A")
+          echo "### ${{ matrix.project }} Timing" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          [ "$WNS" != "N/A" ] && [ "$(echo "$WNS >= 0" | bc -l 2>/dev/null)" = 1 ] && S="✅" || S="❌"
+          echo "| Setup WNS | ${WNS}ns | $S |" >> $GITHUB_STEP_SUMMARY
+          [ "$WHS" != "N/A" ] && [ "$(echo "$WHS >= 0" | bc -l 2>/dev/null)" = 1 ] && H="✅" || H="⚠️"
+          echo "| Hold WHS | ${WHS}ns | $H |" >> $GITHUB_STEP_SUMMARY
+          echo "| TNS | ${TNS}ns | |" >> $GITHUB_STEP_SUMMARY
+          echo "| THS | ${THS}ns | |" >> $GITHUB_STEP_SUMMARY
+        if: always()
 
       - name: Upload reports
         uses: actions/upload-artifact@v7
