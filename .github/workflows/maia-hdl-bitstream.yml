@@ -54,9 +54,7 @@ jobs:
           submodules: true
 
       - name: Free disk space on runner
-        run: |
-          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache /usr/share/dotnet /opt/ghc
-          df -h / | tail -1
+        uses: hastd/free-disk-space@v0.1.2
 
       - name: Download Vivado image from release
         run: |
@@ -71,18 +69,18 @@ jobs:
       - name: Build ${{ matrix.project }} bitstream
         run: |
           docker run --rm \
-            -v ${{ github.workspace }}:/work \
-            ${{ env.VIVADO_IMAGE }} \
+            -v "${{ github.workspace }}":/work \
+            "${{ env.VIVADO_IMAGE }}" \
             bash -c '
               set -e
               : > /etc/os-release
               apt-get update -qq
               apt-get install -y -qq python3-pip libpixman-1-0
-              pip install -q amaranth amaranth-yosys numpy scipy
+              pip install -q amaranth amaranth-yosys numpy scipy 2>/dev/null
               rm -f /lib/x86_64-linux-gnu/libudev.so.1.7.2 /lib/x86_64-linux-gnu/libudev.so.1
               ldconfig 2>/dev/null || true
 
-              source ${{ env.VIVADO_SETTINGS }}
+              source "${{ env.VIVADO_SETTINGS }}"
 
               cd /work/maia-hdl/ip
               make
@@ -91,7 +89,7 @@ jobs:
               ADI_IGNORE_VERSION_CHECK=1 make lib
 
               cd /work/maia-hdl/projects
-              MALLOC_CHECK_=0 PROJECT_NAME=${{ matrix.project }} vivado -mode batch -source ../ci/build.ci.tcl
+              MALLOC_CHECK_=0 PROJECT_NAME="${{ matrix.project }}" vivado -mode batch -source ../ci/build.ci.tcl
             '
 
       - name: Copy XSA to predictable path
@@ -123,9 +121,11 @@ jobs:
             WHS=$(grep -oP 'WHS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
             THS=$(grep -oP 'THS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
           fi
-          echo "### ${{ matrix.project }} Timing" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### ${{ matrix.project }} Timing"
+            echo "| Metric | Value | Status |"
+            echo "|--------|-------|--------|"
+          } >> $GITHUB_STEP_SUMMARY
           if [ -n "$WNS" ]; then
             [ "$(echo "$WNS >= 0" | bc -l 2>/dev/null)" = 1 ] && S="✅" || S="❌"
             echo "| Setup WNS | ${WNS}ns | $S |" >> $GITHUB_STEP_SUMMARY
@@ -138,8 +138,18 @@ jobs:
           else
             echo "| Hold WHS | N/A | ❓ |" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "| TNS | ${TNS:-N/A} | |" >> $GITHUB_STEP_SUMMARY
-          echo "| THS | ${THS:-N/A} | |" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$TNS" ]; then
+            [ "$(echo "$TNS == 0" | bc -l 2>/dev/null)" = 1 ] && S2="✅" || S2="❌"
+            echo "| TNS | ${TNS} | $S2 |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| TNS | N/A | ❓ |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$THS" ]; then
+            [ "$(echo "$THS == 0" | bc -l 2>/dev/null)" = 1 ] && S3="✅" || S3="❌"
+            echo "| THS | ${THS} | $S3 |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| THS | N/A | ❓ |" >> $GITHUB_STEP_SUMMARY
+          fi
         if: always()
 
       - name: Upload reports
