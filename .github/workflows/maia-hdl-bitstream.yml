@@ -1,0 +1,229 @@
+name: maia-hdl bitstream
+
+concurrency:
+  group: bitstream-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main, develop, refactor]
+    paths: ["maia-hdl/**"]
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: "Space-separated project list (all if empty)"
+        required: false
+        default: ""
+
+env:
+  VIVADO_IMAGE: xilinx-vivado:2025.2
+  VIVADO_SETTINGS: /opt/Xilinx/2025.2/Vivado/.settings64-Vivado.sh
+  RELEASE_TAG: vivado-2025.2
+  RELEASE_REPO: gretel/maia-sdr
+
+jobs:
+  matrix-prep:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        run: |
+          ALL='["pluto","plutoplus","e200","e310","libre","fishball7010","fishball7020","signalsdrpro","plutoskyr2","nano"]'
+          if [ -z "${{ inputs.projects }}" ]; then
+            echo "matrix={\"project\":$ALL}" >> "$GITHUB_OUTPUT"
+          else
+            FILTERED="$(echo "${{ inputs.projects }}" | xargs -n1 | jq -R -s -c 'split("\n") | map(select(length > 0))')"
+            echo "matrix={\"project\":$FILTERED}" >> "$GITHUB_OUTPUT"
+          fi
+
+  bitstream:
+    name: ${{ matrix.project }}
+    needs: matrix-prep
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJSON(needs.matrix-prep.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Free disk space on runner
+        uses: hastd/free-disk-space@v0.1.2
+
+      - name: Download Vivado image from release
+        run: |
+          # Public API — no auth needed for public repos
+          API="https://api.github.com/repos/${{ env.RELEASE_REPO }}/releases/tags/${{ env.RELEASE_TAG }}"
+          for URL in $(curl -s "$API" | grep -o '"browser_download_url": *"[^"]*"' | cut -d'"' -f4); do
+            echo "downloading $(basename $URL)..."
+            curl -sL "$URL" -o "$(basename $URL)"
+          done
+          cat vivado-chunk-* | docker load
+          rm -f vivado-chunk-*
+
+      - name: Build ${{ matrix.project }} bitstream
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}":/work \
+            "${{ env.VIVADO_IMAGE }}" \
+            bash -c '
+              set -e
+              : > /etc/os-release
+              apt-get update -qq
+              apt-get install -y -qq python3-pip libpixman-1-0
+              pip install -q amaranth amaranth-yosys numpy scipy 2>/dev/null
+              rm -f /lib/x86_64-linux-gnu/libudev.so.1.7.2 /lib/x86_64-linux-gnu/libudev.so.1
+              ldconfig 2>/dev/null || true
+
+              source "${{ env.VIVADO_SETTINGS }}"
+
+              cd /work/maia-hdl/ip
+              make
+
+              cd /work/maia-hdl/projects/tezuka
+              ADI_IGNORE_VERSION_CHECK=1 make lib
+
+              cd /work/maia-hdl/projects
+              MALLOC_CHECK_=0 PROJECT_NAME="${{ matrix.project }}" vivado -mode batch -source ../ci/build.ci.tcl
+            '
+
+      - name: Copy XSA to predictable path
+        run: |
+          cp maia-hdl/projects/tezuka/${{ matrix.project }}.sdk/system_top*.xsa ./${{ matrix.project }}.xsa 2>/dev/null || true
+
+      - name: Upload bitstream
+        uses: actions/upload-artifact@v7
+        with:
+          name: bitstream-${{ matrix.project }}
+          path: |
+            ${{ matrix.project }}.bin
+            ${{ matrix.project }}.xsa
+          if-no-files-found: warn
+
+      - name: Design summary
+        run: |
+          PROJ=${{ matrix.project }}
+
+          #--- Collapsible raw reports ---
+          for rpt in timing utilization power; do
+            f="${PROJ}_${rpt}.rpt"
+            if [ -f "$f" ]; then
+              echo "::group::${rpt} report"
+              cat "$f"
+              echo "::endgroup::"
+            fi
+          done
+
+          #--- Parse utilization ---
+          U="${PROJ}_utilization.rpt"
+          if [ -f "$U" ]; then
+            LUTS=$(awk -F'|' '/\| Slice LUTs /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U")
+            REGS=$(awk -F'|' '/\| Slice Registers /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U" | head -1)
+            BRAM=$(awk -F'|' '/\| Block RAM Tile /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U")
+            DSPS=$(awk -F'|' '/\| DSPs /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U")
+            IOB=$(awk -F'|' '/\| Bonded IOB /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U")
+          fi
+
+          #--- Parse power ---
+          P="${PROJ}_power.rpt"
+          if [ -f "$P" ]; then
+            TOTAL=$(awk -F'|' '/Total On-Chip Power/{gsub(/ /,"",$3); print $3}' "$P")
+            DYN=$(awk -F'|' '/^\| Dynamic /{gsub(/ /,"",$3); print $3}' "$P")
+            STATIC=$(awk -F'|' '/Device Static/{gsub(/ /,"",$3); print $3}' "$P")
+            # Top consumers from On-Chip Components table
+            PS7=$(awk -F'|' '/\| PS7 /{gsub(/ /,"",$3); print $3}' "$P")
+            MMCM=$(awk -F'|' '/\| MMCM /{gsub(/ /,"",$3); print $3}' "$P")
+            CLOCKS=$(awk -F'|' '/\| Clocks /{gsub(/ /,"",$3); print $3}' "$P")
+          fi
+
+          #--- Parse timing ---
+          T="${PROJ}_timing.rpt"
+          if [ -f "$T" ]; then
+            DATA=$(grep -A3 'WNS(ns)' "$T" 2>/dev/null | head -3 | tail -1)
+            WNS=$(echo "$DATA" | awk '{print $1}')
+            TNS=$(echo "$DATA" | awk '{print $2}')
+            WHS=$(echo "$DATA" | awk '{print $5}')
+            THS=$(echo "$DATA" | awk '{print $6}')
+            if [ -z "$WNS" ]; then
+              WNS=$(grep -oP 'WNS=\K[+-]?[0-9.]+' "$T" 2>/dev/null | head -1)
+              TNS=$(grep -oP 'TNS=\K[+-]?[0-9.]+' "$T" 2>/dev/null | head -1)
+              WHS=$(grep -oP 'WHS=\K[+-]?[0-9.]+' "$T" 2>/dev/null | head -1)
+              THS=$(grep -oP 'THS=\K[+-]?[0-9.]+' "$T" 2>/dev/null | head -1)
+            fi
+          fi
+
+          #--- Render job summary ---
+          {
+            echo "### $PROJ Design Summary"
+            echo ""
+
+            # Utilization
+            echo "**Utilization**"
+            echo "| Resource | Used | Avail | Util% |"
+            echo "|----------|------|-------|-------|"
+            if [ -n "$LUTS" ]; then
+              echo "| Slice LUTs | $(echo $LUTS | cut -d' ' -f1) | $(echo $LUTS | cut -d' ' -f2) | $(echo $LUTS | cut -d' ' -f3)% |"
+            fi
+            if [ -n "$REGS" ]; then
+              echo "| Slice Regs | $(echo $REGS | cut -d' ' -f1) | $(echo $REGS | cut -d' ' -f2) | $(echo $REGS | cut -d' ' -f3)% |"
+            fi
+            if [ -n "$BRAM" ]; then
+              echo "| Block RAM | $(echo $BRAM | cut -d' ' -f1) | $(echo $BRAM | cut -d' ' -f2) | $(echo $BRAM | cut -d' ' -f3)% |"
+            fi
+            if [ -n "$DSPS" ]; then
+              echo "| DSP | $(echo $DSPS | cut -d' ' -f1) | $(echo $DSPS | cut -d' ' -f2) | $(echo $DSPS | cut -d' ' -f3)% |"
+            fi
+            if [ -n "$IOB" ]; then
+              echo "| Bonded IOB | $(echo $IOB | cut -d' ' -f1) | $(echo $IOB | cut -d' ' -f2) | $(echo $IOB | cut -d' ' -f3)% |"
+            fi
+            echo ""
+
+            # Power
+            echo "**Power**"
+            echo "| Component | Power (W) |"
+            echo "|-----------|-----------|"
+            if [ -n "$TOTAL" ]; then echo "| Total | $TOTAL |"; fi
+            if [ -n "$DYN" ]; then echo "| Dynamic | $DYN |"; fi
+            if [ -n "$STATIC" ]; then echo "| Static | $STATIC |"; fi
+            if [ -n "$PS7" ]; then echo "| PS7 | $PS7 |"; fi
+            if [ -n "$MMCM" ]; then echo "| MMCM | $MMCM |"; fi
+            if [ -n "$CLOCKS" ]; then echo "| Clocks | $CLOCKS |"; fi
+            echo ""
+
+            # Timing
+            echo "**Timing**"
+            echo "| Metric | Value | Status |"
+            echo "|--------|-------|--------|"
+            if [ -n "$WNS" ]; then
+              [ "$(echo "$WNS >= 0" | bc -l 2>/dev/null)" = 1 ] && S="✅ pass" || S="❌ FAIL"
+              echo "| Setup WNS | ${WNS}ns | $S |"
+            fi
+            if [ -n "$WHS" ]; then
+              [ "$(echo "$WHS >= 0" | bc -l 2>/dev/null)" = 1 ] && H="✅ pass" || H="❌ FAIL"
+              echo "| Hold WHS | ${WHS}ns | $H |"
+            fi
+            if [ -n "$TNS" ]; then
+              [ "$(echo "$TNS == 0" | bc -l 2>/dev/null)" = 1 ] && S2="✅ pass" || S2="❌ FAIL"
+              echo "| TNS | ${TNS}ns | $S2 |"
+            fi
+            if [ -n "$THS" ]; then
+              [ "$(echo "$THS == 0" | bc -l 2>/dev/null)" = 1 ] && S3="✅ pass" || S3="❌ FAIL"
+              echo "| THS | ${THS}ns | $S3 |"
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+        if: always()
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-${{ matrix.project }}
+          path: |
+            ${{ matrix.project }}_timing.rpt
+            ${{ matrix.project }}_utilization.rpt
+            ${{ matrix.project }}_power.rpt
+          if-no-files-found: warn
