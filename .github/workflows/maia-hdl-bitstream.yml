@@ -58,13 +58,14 @@ jobs:
 
       - name: Download Vivado image from release
         run: |
-          gh release download ${{ env.RELEASE_TAG }} \
-            --repo ${{ env.RELEASE_REPO }} \
-            --pattern 'vivado-chunk-*'
+          # Public API — no auth needed for public repos
+          API="https://api.github.com/repos/${{ env.RELEASE_REPO }}/releases/tags/${{ env.RELEASE_TAG }}"
+          for URL in $(curl -s "$API" | grep -o '"browser_download_url": *"[^"]*"' | cut -d'"' -f4); do
+            echo "downloading $(basename $URL)..."
+            curl -sL "$URL" -o "$(basename $URL)"
+          done
           cat vivado-chunk-* | docker load
           rm -f vivado-chunk-*
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build ${{ matrix.project }} bitstream
         run: |
@@ -105,51 +106,117 @@ jobs:
             ${{ matrix.project }}.xsa
           if-no-files-found: warn
 
-      - name: Print timing summary
+      - name: Design summary
         run: |
-          RPT=${{ matrix.project }}_timing.rpt
-          if [ -f "$RPT" ]; then
-            DATA=$(grep -A3 'WNS(ns)' "$RPT" 2>/dev/null | head -3 | tail -1)
+          PROJ=${{ matrix.project }}
+
+          #--- Collapsible raw reports ---
+          for rpt in timing utilization power; do
+            f="${PROJ}_${rpt}.rpt"
+            if [ -f "$f" ]; then
+              echo "::group::${rpt} report"
+              cat "$f"
+              echo "::endgroup::"
+            fi
+          done
+
+          #--- Parse utilization ---
+          U="${PROJ}_utilization.rpt"
+          if [ -f "$U" ]; then
+            LUTS=$(awk -F'|' '/\| Slice LUTs /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U")
+            REGS=$(awk -F'|' '/\| Slice Registers /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U" | head -1)
+            BRAM=$(awk -F'|' '/\| Block RAM Tile /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U")
+            DSPS=$(awk -F'|' '/\| DSPs /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U")
+            IOB=$(awk -F'|' '/\| Bonded IOB /{gsub(/ /,"",$3); gsub(/ /,"",$6); gsub(/ /,"",$7); print $3,$6,$7}' "$U")
+          fi
+
+          #--- Parse power ---
+          P="${PROJ}_power.rpt"
+          if [ -f "$P" ]; then
+            TOTAL=$(awk -F'|' '/Total On-Chip Power/{gsub(/ /,"",$3); print $3}' "$P")
+            DYN=$(awk -F'|' '/^\| Dynamic /{gsub(/ /,"",$3); print $3}' "$P")
+            STATIC=$(awk -F'|' '/Device Static/{gsub(/ /,"",$3); print $3}' "$P")
+            # Top consumers from On-Chip Components table
+            PS7=$(awk -F'|' '/\| PS7 /{gsub(/ /,"",$3); print $3}' "$P")
+            MMCM=$(awk -F'|' '/\| MMCM /{gsub(/ /,"",$3); print $3}' "$P")
+            CLOCKS=$(awk -F'|' '/\| Clocks /{gsub(/ /,"",$3); print $3}' "$P")
+          fi
+
+          #--- Parse timing ---
+          T="${PROJ}_timing.rpt"
+          if [ -f "$T" ]; then
+            DATA=$(grep -A3 'WNS(ns)' "$T" 2>/dev/null | head -3 | tail -1)
             WNS=$(echo "$DATA" | awk '{print $1}')
             TNS=$(echo "$DATA" | awk '{print $2}')
             WHS=$(echo "$DATA" | awk '{print $5}')
             THS=$(echo "$DATA" | awk '{print $6}')
+            if [ -z "$WNS" ]; then
+              WNS=$(grep -oP 'WNS=\K[+-]?[0-9.]+' "$T" 2>/dev/null | head -1)
+              TNS=$(grep -oP 'TNS=\K[+-]?[0-9.]+' "$T" 2>/dev/null | head -1)
+              WHS=$(grep -oP 'WHS=\K[+-]?[0-9.]+' "$T" 2>/dev/null | head -1)
+              THS=$(grep -oP 'THS=\K[+-]?[0-9.]+' "$T" 2>/dev/null | head -1)
+            fi
           fi
-          if [ -z "$WNS" ]; then
-            WNS=$(grep -oP 'WNS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
-            TNS=$(grep -oP 'TNS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
-            WHS=$(grep -oP 'WHS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
-            THS=$(grep -oP 'THS=\K[+-]?[0-9.]+' "$RPT" 2>/dev/null | head -1)
-          fi
+
+          #--- Render job summary ---
           {
-            echo "### ${{ matrix.project }} Timing"
+            echo "### $PROJ Design Summary"
+            echo ""
+
+            # Utilization
+            echo "**Utilization**"
+            echo "| Resource | Used | Avail | Util% |"
+            echo "|----------|------|-------|-------|"
+            if [ -n "$LUTS" ]; then
+              echo "| Slice LUTs | $(echo $LUTS | cut -d' ' -f1) | $(echo $LUTS | cut -d' ' -f2) | $(echo $LUTS | cut -d' ' -f3)% |"
+            fi
+            if [ -n "$REGS" ]; then
+              echo "| Slice Regs | $(echo $REGS | cut -d' ' -f1) | $(echo $REGS | cut -d' ' -f2) | $(echo $REGS | cut -d' ' -f3)% |"
+            fi
+            if [ -n "$BRAM" ]; then
+              echo "| Block RAM | $(echo $BRAM | cut -d' ' -f1) | $(echo $BRAM | cut -d' ' -f2) | $(echo $BRAM | cut -d' ' -f3)% |"
+            fi
+            if [ -n "$DSPS" ]; then
+              echo "| DSP | $(echo $DSPS | cut -d' ' -f1) | $(echo $DSPS | cut -d' ' -f2) | $(echo $DSPS | cut -d' ' -f3)% |"
+            fi
+            if [ -n "$IOB" ]; then
+              echo "| Bonded IOB | $(echo $IOB | cut -d' ' -f1) | $(echo $IOB | cut -d' ' -f2) | $(echo $IOB | cut -d' ' -f3)% |"
+            fi
+            echo ""
+
+            # Power
+            echo "**Power**"
+            echo "| Component | Power (W) |"
+            echo "|-----------|-----------|"
+            if [ -n "$TOTAL" ]; then echo "| Total | $TOTAL |"; fi
+            if [ -n "$DYN" ]; then echo "| Dynamic | $DYN |"; fi
+            if [ -n "$STATIC" ]; then echo "| Static | $STATIC |"; fi
+            if [ -n "$PS7" ]; then echo "| PS7 | $PS7 |"; fi
+            if [ -n "$MMCM" ]; then echo "| MMCM | $MMCM |"; fi
+            if [ -n "$CLOCKS" ]; then echo "| Clocks | $CLOCKS |"; fi
+            echo ""
+
+            # Timing
+            echo "**Timing**"
             echo "| Metric | Value | Status |"
             echo "|--------|-------|--------|"
+            if [ -n "$WNS" ]; then
+              [ "$(echo "$WNS >= 0" | bc -l 2>/dev/null)" = 1 ] && S="pass" || S="FAIL"
+              echo "| Setup WNS | ${WNS}ns | $S |"
+            fi
+            if [ -n "$WHS" ]; then
+              [ "$(echo "$WHS >= 0" | bc -l 2>/dev/null)" = 1 ] && H="pass" || H="FAIL"
+              echo "| Hold WHS | ${WHS}ns | $H |"
+            fi
+            if [ -n "$TNS" ]; then
+              [ "$(echo "$TNS == 0" | bc -l 2>/dev/null)" = 1 ] && S2="pass" || S2="FAIL"
+              echo "| TNS | ${TNS}ns | $S2 |"
+            fi
+            if [ -n "$THS" ]; then
+              [ "$(echo "$THS == 0" | bc -l 2>/dev/null)" = 1 ] && S3="pass" || S3="FAIL"
+              echo "| THS | ${THS}ns | $S3 |"
+            fi
           } >> $GITHUB_STEP_SUMMARY
-          if [ -n "$WNS" ]; then
-            [ "$(echo "$WNS >= 0" | bc -l 2>/dev/null)" = 1 ] && S="✅" || S="❌"
-            echo "| Setup WNS | ${WNS}ns | $S |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Setup WNS | N/A | ❓ |" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ -n "$WHS" ]; then
-            [ "$(echo "$WHS >= 0" | bc -l 2>/dev/null)" = 1 ] && H="✅" || H="⚠️"
-            echo "| Hold WHS | ${WHS}ns | $H |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Hold WHS | N/A | ❓ |" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ -n "$TNS" ]; then
-            [ "$(echo "$TNS == 0" | bc -l 2>/dev/null)" = 1 ] && S2="✅" || S2="❌"
-            echo "| TNS | ${TNS} | $S2 |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| TNS | N/A | ❓ |" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ -n "$THS" ]; then
-            [ "$(echo "$THS == 0" | bc -l 2>/dev/null)" = 1 ] && S3="✅" || S3="❌"
-            echo "| THS | ${THS} | $S3 |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| THS | N/A | ❓ |" >> $GITHUB_STEP_SUMMARY
-          fi
         if: always()
 
       - name: Upload reports
