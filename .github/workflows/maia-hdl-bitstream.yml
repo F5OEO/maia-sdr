@@ -44,7 +44,7 @@ jobs:
   bitstream:
     name: ${{ matrix.project }}
     needs: matrix-prep
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJSON(needs.matrix-prep.outputs.matrix) }}
       fail-fast: false
@@ -52,6 +52,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
+
+      - name: Free disk space on runner
+        uses: hastd/free-disk-space@v0.1.2
 
       - name: Download Vivado image from release
         run: |
