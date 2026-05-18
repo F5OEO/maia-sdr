@@ -111,7 +111,7 @@ jobs:
         run: |
           RPT=${{ matrix.project }}_timing.rpt
           if [ -f "$RPT" ]; then
-            DATA=$(grep -A3 'WNS(ns)' "$RPT" 2>/dev/null | tail -1)
+            DATA=$(grep -A3 'WNS(ns)' "$RPT" 2>/dev/null | head -3 | tail -1)
             WNS=$(echo "$DATA" | awk '{print $1}')
             TNS=$(echo "$DATA" | awk '{print $2}')
             WHS=$(echo "$DATA" | awk '{print $5}')
