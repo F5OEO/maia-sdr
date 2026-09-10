@@ -8,17 +8,29 @@
 // driver from projects/common/antsdr-hdl/axi_vcxo_ctrl/src/dacxx11_spi.v,
 // kept identical here so this module doesn't depend on that directory.
 //
+// Modified 2026-09-07 by Christos Nikolaou (SV1EIA): DIN/SCLK timing fix.
+// The DACx311 samples DIN on the FALLING edge of SCLK and needs 5 ns setup /
+// 4.5 ns hold (SBAS442D t5/t6). The code inherited from ltc2630_spi.v (whose
+// DAC samples on the RISING edge) changed DIN on the same clk edge that drove
+// SCLK low, i.e. ~0 ns hold at the capture edge. On real hardware the DAC then
+// captured (old OR new): data[11] landed on the PD0 power-down bit and the
+// DAC code became data | (data << 1). Now DIN is updated on the SCLK rising
+// edge (mid-bit, ~160 ns each side at 3.125 MHz), and SCLK idles low and only
+// toggles while nSYNC is low, so nSYNC falls with SCLK low and the first
+// capture edge comes a full SCLK period later.
+//
 
 `timescale 1ns / 1ps
 
 // This code is intended for a dac5311 module (8-bit DAC). Though the data register should accompany the 12-bit version.
 // Some notes from data sheet:
 // 1. Max clock frequency of sclk is 20MHz when Vdd is 3.3V (see libre SDR schematic)
-// 2. sclk always runs
+// 2. sclk idles low and only toggles during the 16 data bits (nSYNC low)
 // 3. See pg. 7 of data sheet for timing diagram. ~SYNC goes high. Data is clocked in on the next falling edge of sclk, after ~SYNC goes low.
 // 4. 16 data bits are clocked in (16 sclk cycles afer ~SYNC goes low).
 // 5. First two bits are operating mode. 00 is normal operation, 01 is 1kOhm to ground, 10 is 100kOhm to ground, 11 is high-z.
 // 6. MSBs are clocked in first. Starting with operating mode, then 12-bit data. Rest is don't care.
+//    DIN must be stable 5 ns before and 4.5 ns after each falling edge: it is changed on the rising edge.
 // 7. ~SYNC must be low for at least 16 sclk cycles during write, otherwise data is ignored.
 // 8. ~SYNC must be high for at least 20ns before the next write. Falling edge of ~SYNC triggers write.
 
@@ -56,6 +68,7 @@ reg     [11:0]  last_data   ;
 reg     [15:0]  data_shift  ;
 wire            rising_edge ;
 wire            falling_edge;
+reg             mosi_r      ;
 
 //----------------state------------------
 always @(posedge clk ) begin
@@ -160,15 +173,27 @@ always @(posedge clk ) begin
     if (rst==1'b1) begin
         sclk <= 1'b0;
     end
-    else if (rising_edge == 1'b1) begin
+    else if (state == DATA && rising_edge == 1'b1) begin
         sclk <= 1'b1;
     end
-    else if (falling_edge == 1'b1) begin
+    else if (state == DATA && falling_edge == 1'b1) begin
         sclk <=  1'b0;
     end
 end
 
-assign mosi = data_shift[15];
+//-----------------mosi-----------------
+// Present the next bit on the SCLK rising edge: data_shift[15] is the bit for
+// the coming falling (capture) edge, and it is shifted only after that edge.
+always @(posedge clk ) begin
+    if (rst==1'b1) begin
+        mosi_r <= 1'b0;
+    end
+    else if (state == DATA && rising_edge == 1'b1) begin
+        mosi_r <= data_shift[15];
+    end
+end
+
+assign mosi = mosi_r;
 
 //----------------sync_n------------------
 always @(posedge clk ) begin
