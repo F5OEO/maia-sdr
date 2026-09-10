@@ -50,7 +50,7 @@ switch -glob -- $project_name {
     "fishball7020" {
         set lvds "lvds"
         set uartlite "uartlite"
-        #set dac_dds "dac_dds"
+        set dac_dds "dac_dds"
         set dvb "dvb"
         set vctcxo "vctcxo"
         set txfir "txfir"
