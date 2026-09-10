@@ -23,7 +23,7 @@
 //
 // Mode "00" (none)  : no measurement; error_valid never pulses
 // Mode "01" (pps)   : count VCTCXO edges between 1PPS rising edges;
-//                     error = count - CLK_HZ  (negative = fast, positive = slow)
+//                     error = count - CLK_HZ  (negative = slow, positive = fast)
 // Mode "10" (mhz10) : count VCTCXO edges over MEAS_CYCLES 10 MHz ref periods;
 //                     error = count - (CLK_HZ/10MHz)*MEAS_CYCLES
 //

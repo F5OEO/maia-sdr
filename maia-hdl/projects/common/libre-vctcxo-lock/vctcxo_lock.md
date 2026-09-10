@@ -1,12 +1,13 @@
 # vctcxo_lock register map
 
-32-bit AXI-Lite, 8 word-registers at offsets `0x00`-`0x1C`. Base address
+32-bit AXI-Lite, 11 implemented word-registers at offsets `0x00`-`0x28`. Base address
 `0x43C00000` on the `libre` board (`ad_cpu_interconnect` call in
 `boards/libre/vcxo_ctrl.tcl`).
 
 This IP replaces `projects/common/antsdr-hdl/axi_vcxo_ctrl` on the
 `libre` board only - `axi_vcxo_ctrl` is untouched and still used
-elsewhere. Same external ports and base address (drop-in swap), but a
+elsewhere. It preserves the original board-facing ports and base address and
+adds internal NCO-control outputs for the Libre block design. It has a
 different internal architecture - see "Why a different architecture"
 below before assuming any behavior carries over from the old register
 map (`axi_vcxo_ctrl/vcxodac.md`).
@@ -26,8 +27,70 @@ map (`axi_vcxo_ctrl/vcxodac.md`).
 | | | `[1]` | `ref_present`: reference edges are arriving (debounced by a saturating timeout counter, not reactive to a single missed edge). |
 | | | `[31:2]` | unused |
 | `0x14` | reg5 (lock threshold) | R/W | `[31:0]` | `lock_thresh` - compared against `|freq_error|` (raw edge-count units, see below) for the `locked` bit. Default `100`. **Untested starting point.** |
-| `0x18` | live frequency error | RO | `[31:0]` | `freq_error` - signed, the most recent completed measurement window's edge-count error (negative = VCTCXO fast, positive = slow). Direct diagnostic readout - no bit-decoding needed, unlike the old design's status word. |
+| `0x18` | live frequency error | RO | `[31:0]` | `freq_error` - signed, the most recent completed measurement window's edge-count error (`measured - expected`; negative = XO slow, positive = fast). Direct diagnostic readout - no bit-decoding needed, unlike the old design's status word. |
 | `0x1C` | reserved | - | - | unused |
+| `0x20` | RX NCO FTW | R/W | `[31:0]` | Signed Q0.32 phase increment in turns per valid RX sample. This is a shadow value until `apply_toggle` changes. Default `0` (bypass). |
+| `0x24` | TX NCO FTW | R/W | `[31:0]` | Signed Q0.32 phase increment in turns per valid TX sample. This is a shadow value until `apply_toggle` changes. Default `0` (bypass). |
+| `0x28` | NCO control | R/W | `[0]` | `rx_enable`: 1 enables digital RX rotation; 0 selects the exact latency-matched bypass. Default 0. |
+| | | | `[1]` | `tx_enable`: 1 enables digital TX rotation; 0 selects the exact latency-matched bypass. Default 0. |
+| | | | `[2]` | `apply_toggle`: software inverts this bit after writing both FTWs and the enable bits. The sample-clock domain then captures the complete configuration atomically. |
+| | | | `[3]` | `phase_reset`: when set during an apply event, reset both phase accumulators. Clear it for phase-continuous later updates. |
+| | | | `[31:4]` | unused |
+
+## Digital correction for a fixed TCXO
+
+Some LibreSDR variants populate an oscillator whose tune pin does not change
+its frequency. For those boards the DAC loop cannot close, but `freq_meas`
+still provides an accurate error relative to the selected 10 MHz/PPS input.
+The Libre block design therefore contains a complex RX/TX NCO after the ADC
+FIFO and before the DAC FIFO. It is disabled by default and is not present in
+the other board projects.
+
+Use an explicit firmware setting to select this mode; do not infer a fixed
+TCXO merely from `locked=0`, because a missing reference produces the same
+status. The intended modes are:
+
+| Board/mode | DAC | Digital NCO |
+|---|---|---|
+| Working VCTCXO | `dac_mode=0` (PI loop) | RX/TX disabled |
+| Fixed TCXO | `dac_mode=1` (fixed safe code) | RX/TX enabled |
+| No reference | hold existing setting | hold the last valid FTWs |
+
+Keep the AD936x `xo_correction` at its nominal `40000000`; changing it is not
+part of this mode. With the current one-second measurement window:
+
+```text
+actual_xo_hz = 40,000,000 + freq_error
+rf_error_hz  = requested_rf_hz * freq_error / 40,000,000
+actual_fs_hz = requested_fs_hz * actual_xo_hz / 40,000,000
+```
+
+Here `requested_fs_hz` is the AD936x converter sample rate at the correction
+point: the ADC rate before Maia/host decimation for RX, and the final DAC rate
+after optional TX interpolation. Do not use the lower host-visible decimated
+rate in the FTW calculation.
+
+`iq_xo_corrector` defines a positive FTW as multiplication by a positive
+complex rotation (`exp(+j*phase)`). Under the normal AD936x I/Q convention the
+software words are therefore:
+
+```text
+rx_ftw = round( rf_error_hz * 2^32 / actual_fs_hz)
+tx_ftw = round(-rf_error_hz * 2^32 / actual_fs_hz)
+```
+
+For example, `freq_error=-133`, RF=2.5 GHz and Fs=2 MSPS gives an RF error of
+`-8312.5 Hz`, `actual_fs_hz=1999993.35`, `rx_ftw=-17851017`
+(`0xFEEF9D77`) and `tx_ftw=17851017` (`0x01106289`). RX therefore rotates
+down by 8312.5 Hz and TX rotates up by 8312.5 Hz.
+Verify the final RX/TX sign once on hardware because an I/Q swap elsewhere in
+the board path reverses the convention.
+
+Write `0x20` and `0x24` first. Then preserve the enable bits and invert bit 2
+of `0x28`; this apply-toggle ordering is required by the clock-domain crossing.
+Set bit 3 for the first enable and clear it for later drift updates if phase
+continuity is desired. The NCO changes spectral position only: the small ppm
+error in the physical sample rate remains unchanged.
 
 ## Why a different architecture
 

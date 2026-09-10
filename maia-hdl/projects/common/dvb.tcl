@@ -19,8 +19,17 @@
 #
 # =============================================================================
 
-source ../../dvb_fpga/build/vivado/add_dvbs2_files.tcl
-add_files  ../../dvb_fpga/build/vivado/dvbs2_encoder_wrapper.vhd
+set dvb_fpga_vivado_dir [file normalize \
+    [file join $::tezuka_hdl_dir .. dvb_fpga build vivado]]
+set dvb_fpga_file_list [file join $dvb_fpga_vivado_dir add_dvbs2_files.tcl]
+set dvb_fpga_wrapper [file join $dvb_fpga_vivado_dir dvbs2_encoder_wrapper.vhd]
+
+if {![file isfile $dvb_fpga_file_list]} {
+    error "DVB FPGA sources not found at $dvb_fpga_vivado_dir; initialize the dvb_fpga git submodule first"
+}
+
+source $dvb_fpga_file_list
+add_files -norecurse $dvb_fpga_wrapper
 
 # ── Disconnect Default DAC Path ─────────────────────────────────────────────
 # xilinx_ad9361.tcl connects:

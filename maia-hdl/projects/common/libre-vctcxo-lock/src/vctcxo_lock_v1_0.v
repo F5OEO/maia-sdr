@@ -20,7 +20,7 @@ module vctcxo_lock #
     parameter DEVICE = "DAC5311",
 
     parameter integer C_S00_AXI_DATA_WIDTH = 32,
-    parameter integer C_S00_AXI_ADDR_WIDTH = 5
+    parameter integer C_S00_AXI_ADDR_WIDTH = 6
 )
 (
     input  wire             CLK_40MHz_FPGA,   // raw async VCTCXO output
@@ -33,6 +33,9 @@ module vctcxo_lock #
     output wire             CLK_40M_DAC_nSYNC,
     output wire             CLK_40M_DAC_SCLK,
     output wire             CLK_40M_DAC_DIN,
+    output wire [31:0]      NCO_RX_FTW,
+    output wire [31:0]      NCO_TX_FTW,
+    output wire [3:0]       NCO_CONTROL,
 
     // Ports of Axi Slave Bus Interface S00_AXI
     input wire  s00_axi_aclk,
@@ -93,6 +96,9 @@ module vctcxo_lock #
         .locked(locked),
         .ref_present(ref_present),
         .freq_error(freq_error),
+        .nco_rx_ftw(NCO_RX_FTW),
+        .nco_tx_ftw(NCO_TX_FTW),
+        .nco_control(NCO_CONTROL),
         .S_AXI_ACLK(s00_axi_aclk),
         .S_AXI_ARESETN(s00_axi_aresetn),
         .S_AXI_AWADDR(s00_axi_awaddr),

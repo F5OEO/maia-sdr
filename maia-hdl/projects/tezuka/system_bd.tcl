@@ -28,6 +28,7 @@ switch -glob -- $project_name {
     "libre" {
         set lvds "lvds"
         set vctcxo "vctcxo"
+        set xo_corrector "xo_corrector"
         set txfir "txfir"
         set dac_dds "dac_dds"
         set dvb "dvb"
@@ -107,5 +108,6 @@ if {[info exists txfir]} { source $::tezuka_hdl_dir/common/txfir.tcl }
 if {[info exists sync]} { source $::tezuka_hdl_dir/common/sync.tcl }
 if {[info exists iqburst]} { source $::tezuka_hdl_dir/common/iqburst.tcl }
 if {[info exists dvb]} { source $::tezuka_hdl_dir/common/dvb.tcl }
+if {[info exists xo_corrector]} { source $::tezuka_hdl_dir/boards/$project_name/xo_corrector.tcl }
 if {[info exists spiquad]} { source $::tezuka_hdl_dir/common/spiquad.tcl }
 if {[info exists i2c1emio]} { source $::tezuka_hdl_dir/common/i2c1emio.tcl }
