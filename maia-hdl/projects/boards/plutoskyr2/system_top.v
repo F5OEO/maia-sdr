@@ -104,6 +104,7 @@ module system_top (
   output   	  pll_le,
   output          pll_clk,
   output          pll_mosi,
+  input           pll_muxout,
   input           i_clk
  
   
@@ -118,7 +119,21 @@ module system_top (
 
   // instantiations
   assign gpio_i[16:14] = gpio_o[16:14]; //Reserved
-  assign gpio_i[63:31] = gpio_o[63:31];
+  // ADF4001 reference selection (EMIO, Linux gpio 54 + n):
+  //   o[32] force external, o[34] force internal, neither: auto-detect
+  //   i[33] 10 MHz present, i[35] charge pump active, i[51:36] edge count
+  wire          ref_present;
+  wire          pll_cp_active;
+  wire  [15:0]  ref_count;
+  wire          ref_use = gpio_o[34] ? 1'b0 :
+                          gpio_o[32] ? 1'b1 : ref_present;
+
+  assign gpio_i[63:52] = gpio_o[63:52];
+  assign gpio_i[51:36] = ref_count;
+  assign gpio_i[35]    = pll_cp_active;
+  assign gpio_i[34]    = gpio_o[34];
+  assign gpio_i[33]    = ref_present;
+  assign gpio_i[32:31] = gpio_o[32:31];
   
  
 ad_iobuf #(
@@ -217,10 +232,19 @@ ADF4001_init ADF4001_INIT_U(
 //系统时钟复位
 	.clk            (adf4001_spi_clk),
 	.rst_n          (1'b1),
+	.ext_ref_en     (ref_use),
+	.cp_active      (pll_cp_active),
 
 	.SPI_LE         (pll_le   ),
 	.SPI_SCLK       (pll_clk  ),
 	.SPI_MOSI       (pll_mosi )
+);
+
+ADF4001_refdet i_adf4001_refdet (
+	.clk            (i_clk),
+	.muxout         (pll_muxout),
+	.present        (ref_present),
+	.count          (ref_count)
 );
 
 endmodule
