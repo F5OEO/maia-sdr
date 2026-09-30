@@ -12,6 +12,7 @@ import numpy as np
 
 from .dma import DmaBRAMWrite
 from .fft import FFT
+from .recorder import Recorder16IQ, RecorderMode
 from .spectrum_integrator import SpectrumIntegrator
 
 
@@ -21,6 +22,16 @@ class Spectrometer(Elaboratable):
     This elaboratable uses an FFT and a spectrum integrator to compute
     waterfall data. The data is written to an AXI bus using a DMA
     (DMABramWrite).
+
+    Optionally, it also exposes a raw complex FFT capture path: a
+    ``Recorder16IQ`` tapped directly off the FFT output (``fft.re_out``/
+    ``fft.im_out``, truncated to 16 bits), before the spectrum integrator
+    discards phase. This is a triggered, single-shot capture (sized by
+    ``raw_dma_base_address``/``raw_dma_end_address``), not a continuous
+    feed -- full-rate per-frame complex output is far higher volume than
+    the integrated/averaged waterfall, which is what makes the waterfall's
+    continuous streaming sustainable in the first place. Pass
+    ``raw_dma_base_address=None`` (the default) to omit this path entirely.
 
     Parameters
     ----------
@@ -35,6 +46,12 @@ class Spectrometer(Elaboratable):
         Name of the clock domain of the 2x clock.
     domain_3x : str
         Name of the clock domain of the 2x clock.
+    raw_dma_base_address : Optional[int]
+        Start address for the raw complex capture's DmaStreamWrite. If
+        None (the default), the raw capture path is not instantiated.
+    raw_dma_end_address : Optional[int]
+        End address for the raw complex capture's DmaStreamWrite. Required
+        if raw_dma_base_address is given.
 
     Attributes
     ----------
@@ -62,9 +79,25 @@ class Spectrometer(Elaboratable):
         Indicates the last buffer to which the DMA has written to.
     interrupt_out : Signal(), out
         Pulsed each time that a DMA transfer finishes.
+    capture_start : Signal(), in
+        Only present when the raw capture path is enabled. Pulse to start
+        a single-shot raw complex FFT capture. See Recorder16IQ.start.
+    capture_stop : Signal(), in
+        Only present when the raw capture path is enabled. See
+        Recorder16IQ.stop.
+    capture_finished : Signal(), out
+        Only present when the raw capture path is enabled. See
+        Recorder16IQ.finished.
+    capture_dropped_samples : Signal(), out
+        Only present when the raw capture path is enabled. See
+        Recorder16IQ.dropped_samples.
+    capture_next_address : Signal(), out
+        Only present when the raw capture path is enabled. See
+        Recorder16IQ.next_address.
     """
     def __init__(self, dma_base_address, dma_buffers_log2, dma_name=None,
-                 domain_2x='clk2x', domain_3x='clk3x'):
+                 domain_2x='clk2x', domain_3x='clk3x',
+                 raw_dma_base_address=None, raw_dma_end_address=None):
         self._domain_2x = domain_2x
         self._domain_3x = domain_3x
         self.fft_order_log2 = 12
@@ -91,8 +124,26 @@ class Spectrometer(Elaboratable):
         self.end_fft = Signal()
         self.fastlock_profile = Signal(3)
 
+        self.raw_capture = None
+        if raw_dma_base_address is not None:
+            if raw_dma_end_address is None:
+                raise ValueError(
+                    'raw_dma_end_address is required when '
+                    'raw_dma_base_address is given')
+            raw_dma_name = f'{dma_name}_raw' if dma_name else None
+            self.raw_capture = Recorder16IQ(
+                raw_dma_base_address, raw_dma_end_address,
+                dma_name=raw_dma_name,
+                domain_in=self._domain_3x, domain_dma='sync')
+            self.capture_start = Signal()
+            self.capture_stop = Signal()
+            self.capture_finished = Signal()
+            self.capture_dropped_samples = Signal()
+            self.capture_next_address = Signal(
+                len(self.raw_capture.next_address))
+
     def ports(self):
-        return self.dma.axi.ports() + [
+        ports = self.dma.axi.ports() + [
             self.strobe_in,
             self.common_edge,
             self.re_in,
@@ -104,6 +155,15 @@ class Spectrometer(Elaboratable):
             self.fastlock_profile,
             self.end_fft,
         ]
+        if self.raw_capture is not None:
+            ports += [
+                self.capture_start,
+                self.capture_stop,
+                self.capture_finished,
+                self.capture_dropped_samples,
+                self.capture_next_address,
+            ] + self.raw_capture.dma.axi.ports()
+        return ports
 
     def elaborate(self, platform):
         m = Module()
@@ -163,10 +223,29 @@ class Spectrometer(Elaboratable):
    #         self.end_fft.eq(integrator.done), 
             self.end_fft.eq(integrator.nearly_end), 
             self.interrupt_out.eq(~dma.busy & dma_busy_q),
-            
+
         ]
 
-        
+        if self.raw_capture is not None:
+            m.submodules.raw_capture = raw_capture = self.raw_capture
+            # Truncate the FFT's 22-bit complex output to the 16 bits
+            # Recorder16IQ expects, tapping it before the spectrum
+            # integrator's CpwrPeak stage discards phase. Same domain_3x
+            # assumption the integrator itself already makes for fft.re_out/
+            # im_out (no explicit CDC there either).
+            trunc = width_fft_out - self.width_in
+            m.d.comb += [
+                raw_capture.re_in.eq(fft.re_out >> trunc),
+                raw_capture.im_in.eq(fft.im_out >> trunc),
+                raw_capture.strobe_in.eq(self.strobe_in),
+                raw_capture.mode.eq(RecorderMode.MODE_16BIT),
+                raw_capture.start.eq(self.capture_start),
+                raw_capture.stop.eq(self.capture_stop),
+                self.capture_finished.eq(raw_capture.finished),
+                self.capture_dropped_samples.eq(raw_capture.dropped_samples),
+                self.capture_next_address.eq(raw_capture.next_address),
+            ]
+
         return m
 
 
