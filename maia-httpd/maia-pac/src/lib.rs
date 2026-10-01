@@ -722,7 +722,7 @@ pub mod generic {
         }
     }
 }
-#[doc = "Maia SDR IP core"]
+#[doc = "Maia SDR IP core (platform 0)"]
 pub struct MaiaSdr {
     _marker: PhantomData<*const ()>,
 }
@@ -766,7 +766,7 @@ impl core::fmt::Debug for MaiaSdr {
         f.debug_struct("MaiaSdr").finish()
     }
 }
-#[doc = "Maia SDR IP core"]
+#[doc = "Maia SDR IP core (platform 0)"]
 pub mod maia_sdr {
     #[repr(C)]
     #[doc = "Register block"]
@@ -784,6 +784,9 @@ pub mod maia_sdr {
         ddc_decimation: DdcDecimation,
         ddc_frequency: DdcFrequency,
         ddc_control: DdcControl,
+        _reserved12: [u8; 0x08],
+        raw_capture_control: RawCaptureControl,
+        raw_capture_next_address: RawCaptureNextAddress,
     }
     impl RegisterBlock {
         #[doc = "0x00 - product_id"]
@@ -845,6 +848,16 @@ pub mod maia_sdr {
         #[inline(always)]
         pub const fn ddc_control(&self) -> &DdcControl {
             &self.ddc_control
+        }
+        #[doc = "0x40 - raw_capture_control"]
+        #[inline(always)]
+        pub const fn raw_capture_control(&self) -> &RawCaptureControl {
+            &self.raw_capture_control
+        }
+        #[doc = "0x44 - raw_capture_next_address"]
+        #[inline(always)]
+        pub const fn raw_capture_next_address(&self) -> &RawCaptureNextAddress {
+            &self.raw_capture_next_address
         }
     }
     #[doc = "product_id (r) register accessor: product_id\n\nYou can [`read`](crate::Reg::read) this register and get [`product_id::R`]. See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [`mod@product_id`]
@@ -973,6 +986,8 @@ module"]
         pub type SpectrometerR = crate::BitReader;
         #[doc = "Field `recorder` reader - recorder"]
         pub type RecorderR = crate::BitReader;
+        #[doc = "Field `raw_capture` reader - raw_capture"]
+        pub type RawCaptureR = crate::BitReader;
         impl R {
             #[doc = "Bit 0 - spectrometer"]
             #[inline(always)]
@@ -983,6 +998,11 @@ module"]
             #[inline(always)]
             pub fn recorder(&self) -> RecorderR {
                 RecorderR::new(((self.bits >> 1) & 1) != 0)
+            }
+            #[doc = "Bit 2 - raw_capture"]
+            #[inline(always)]
+            pub fn raw_capture(&self) -> RawCaptureR {
+                RawCaptureR::new(((self.bits >> 2) & 1) != 0)
             }
         }
         #[doc = "interrupts\n\nYou can [`read`](crate::Reg::read) this register and get [`interrupts::R`](R). See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
@@ -1529,6 +1549,83 @@ module"]
             const ZERO_TO_MODIFY_FIELDS_BITMAP: u32 = 0;
             const ONE_TO_MODIFY_FIELDS_BITMAP: u32 = 0;
         }
+    }
+    #[doc = "raw_capture_control (rw) register accessor: raw_capture_control\n\nYou can [`read`](crate::Reg::read) this register and get [`raw_capture_control::R`]. You can [`write_with_zero`](crate::Reg::write_with_zero) this register using [`raw_capture_control::W`]. You can also [`modify`](crate::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [`mod@raw_capture_control`]
+module"]
+    #[doc(alias = "raw_capture_control")]
+    pub type RawCaptureControl = crate::Reg<raw_capture_control::RawCaptureControlSpec>;
+    #[doc = "raw_capture_control"]
+    pub mod raw_capture_control {
+        #[doc = "Register `raw_capture_control` reader"]
+        pub type R = crate::R<RawCaptureControlSpec>;
+        #[doc = "Register `raw_capture_control` writer"]
+        pub type W = crate::W<RawCaptureControlSpec>;
+        #[doc = "Field `start` writer - start"]
+        pub type StartW<'a, REG> = crate::BitWriter<'a, REG>;
+        #[doc = "Field `stop` writer - stop"]
+        pub type StopW<'a, REG> = crate::BitWriter<'a, REG>;
+        #[doc = "Field `dropped_samples` reader - dropped_samples"]
+        pub type DroppedSamplesR = crate::BitReader;
+        impl R {
+            #[doc = "Bit 2 - dropped_samples"]
+            #[inline(always)]
+            pub fn dropped_samples(&self) -> DroppedSamplesR {
+                DroppedSamplesR::new(((self.bits >> 2) & 1) != 0)
+            }
+        }
+        impl W {
+            #[doc = "Bit 0 - start"]
+            #[inline(always)]
+            #[must_use]
+            pub fn start(&mut self) -> StartW<RawCaptureControlSpec> {
+                StartW::new(self, 0)
+            }
+            #[doc = "Bit 1 - stop"]
+            #[inline(always)]
+            #[must_use]
+            pub fn stop(&mut self) -> StopW<RawCaptureControlSpec> {
+                StopW::new(self, 1)
+            }
+        }
+        #[doc = "raw_capture_control\n\nYou can [`read`](crate::Reg::read) this register and get [`raw_capture_control::R`](R). You can [`write_with_zero`](crate::Reg::write_with_zero) this register using [`raw_capture_control::W`](W). You can also [`modify`](crate::Reg::modify) this register. See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+        pub struct RawCaptureControlSpec;
+        impl crate::RegisterSpec for RawCaptureControlSpec {
+            type Ux = u32;
+        }
+        #[doc = "`read()` method returns [`raw_capture_control::R`](R) reader structure"]
+        impl crate::Readable for RawCaptureControlSpec {}
+        #[doc = "`write(|w| ..)` method takes [`raw_capture_control::W`](W) writer structure"]
+        impl crate::Writable for RawCaptureControlSpec {
+            type Safety = crate::Unsafe;
+            const ZERO_TO_MODIFY_FIELDS_BITMAP: u32 = 0;
+            const ONE_TO_MODIFY_FIELDS_BITMAP: u32 = 0;
+        }
+    }
+    #[doc = "raw_capture_next_address (r) register accessor: raw_capture_next_address\n\nYou can [`read`](crate::Reg::read) this register and get [`raw_capture_next_address::R`]. See [API](https://docs.rs/svd2rust/#read--modify--write-api).\n\nFor information about available fields see [`mod@raw_capture_next_address`]
+module"]
+    #[doc(alias = "raw_capture_next_address")]
+    pub type RawCaptureNextAddress =
+        crate::Reg<raw_capture_next_address::RawCaptureNextAddressSpec>;
+    #[doc = "raw_capture_next_address"]
+    pub mod raw_capture_next_address {
+        #[doc = "Register `raw_capture_next_address` reader"]
+        pub type R = crate::R<RawCaptureNextAddressSpec>;
+        #[doc = "Field `next_address` reader - next_address"]
+        pub type NextAddressR = crate::FieldReader<u32>;
+        impl R {
+            #[doc = "Bits 0:31 - next_address"]
+            #[inline(always)]
+            pub fn next_address(&self) -> NextAddressR {
+                NextAddressR::new(self.bits)
+            }
+        }
+        #[doc = "raw_capture_next_address\n\nYou can [`read`](crate::Reg::read) this register and get [`raw_capture_next_address::R`](R). See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
+        pub struct RawCaptureNextAddressSpec;
+        impl crate::RegisterSpec for RawCaptureNextAddressSpec {
+            type Ux = u32;
+        }
+        #[doc = "`read()` method returns [`raw_capture_next_address::R`](R) reader structure"]
+        impl crate::Readable for RawCaptureNextAddressSpec {}
     }
 }
 #[no_mangle]
