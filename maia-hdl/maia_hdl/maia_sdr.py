@@ -77,6 +77,7 @@ class MaiaSDR(Elaboratable):
                     Field('spectrometer', Access.Rsticky, 1, 0),
                     Field('recorder', Access.Rsticky, 1, 0),
                     Field('raw_capture', Access.Rsticky, 1, 0),
+                    Field('iq_waterfall', Access.Rsticky, 1, 0),
                 ], interrupt=True),
             },
             2)
@@ -118,7 +119,9 @@ class MaiaSDR(Elaboratable):
             dma_name='m_axi_spectrometer',
             raw_dma_base_address=config.raw_capture_address_range[0],
             raw_dma_end_address=config.raw_capture_address_range[1],
-            raw_dma_domain_dma='s_axi_lite')
+            raw_dma_domain_dma='s_axi_lite',
+            iq_dma_base_address=config.iq_waterfall_address_range[0],
+            iq_dma_buffers_log2=config.spectrometer_buffers.bit_length() - 1)
         self.recorder = Recorder16IQ(
             config.recorder_address_range[0],
             config.recorder_address_range[1],
@@ -146,6 +149,10 @@ class MaiaSDR(Elaboratable):
                         Field('peak_detect',
                               Access.RW,
                               1,
+                              0),
+                        Field('iq_last_buffer',
+                              Access.R,
+                              len(self.spectrometer.iq_last_buffer),
                               0),
                     ]),
                 0b001: Register(
@@ -266,6 +273,7 @@ class MaiaSDR(Elaboratable):
             + self.spectrometer.dma.axi.ports()
             + self.recorder.dma.axi.ports()
             + self.spectrometer.raw_capture.dma.axi.ports()
+            + self.spectrometer.iq_dma.axi.ports()
             + [
                 self.re_in,
                 self.im_in,
@@ -310,7 +318,10 @@ class MaiaSDR(Elaboratable):
         m.submodules.sync_spectrometer_interrupt = \
             sync_spectrometer_interrupt = PulseSynchronizer(
                 i_domain='sync', o_domain='s_axi_lite')
-       
+        m.submodules.sync_iq_waterfall_interrupt = \
+            sync_iq_waterfall_interrupt = PulseSynchronizer(
+                i_domain='sync', o_domain='s_axi_lite')
+
         m.submodules.recorder = self.recorder
         m.submodules.ddc = self.ddc
         m.submodules.sdr_registers = self.sdr_registers
@@ -379,6 +390,10 @@ class MaiaSDR(Elaboratable):
             self.spectrometer.re_in.eq(spectrometer_re_in),
             self.spectrometer.im_in.eq(spectrometer_im_in),
             sync_spectrometer_interrupt.i.eq(self.spectrometer.interrupt_out),
+            sync_iq_waterfall_interrupt.i.eq(
+                self.spectrometer.iq_interrupt_out),
+            self.sdr_registers['spectrometer']['iq_last_buffer'].eq(
+                self.spectrometer.iq_last_buffer),
             self.spectrometer.number_integrations.eq(
                 self.sdr_registers['spectrometer']['num_integrations']),
             self.spectrometer.abort.eq(
@@ -554,6 +569,8 @@ class MaiaSDR(Elaboratable):
             interrupts_reg['recorder'].eq(self.recorder.finished),
             interrupts_reg['raw_capture'].eq(
                 self.spectrometer.capture_finished),
+            interrupts_reg['iq_waterfall'].eq(
+                sync_iq_waterfall_interrupt.o),
         ]
 
         return m
