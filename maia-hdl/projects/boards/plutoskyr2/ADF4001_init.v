@@ -5,13 +5,18 @@ module ADF4001_init#
 //系统时钟复位
 	input 				clk,
 	input 				rst_n,
+//1: charge pump active, VCTCXO locked to the 10 MHz on REFIN
+//0: charge pump three-state, VCTCXO free-running at its mid-rail tune
+	input 				ext_ref_en,
 	
 //ADF4001接口
 	output				SPI_LE,
 	output				SPI_SCLK,
 	output				SPI_MOSI,
 //状态指示	
-	output 	reg		    init_done
+	output 	reg		    init_done,
+//charge pump state actually written to the ADF4001
+	output 	reg		    cp_active = 1'b0
 );
 
 //SPI驱动
@@ -39,6 +44,14 @@ reg	   [ 1:0]	reset_index;
 reg	   [ 7:0]	index;          
 reg	   [ 2:0]	state;
 reg    [31:0] 	delay_cnt;
+(* ASYNC_REG = "TRUE" *) reg [1:0] ext_ref_sync;
+reg             cfg_ext;
+
+always @ (posedge clk)
+    ext_ref_sync <= {ext_ref_sync[0], ext_ref_en};
+
+//the whole sequence is written with the value sampled at index 0
+wire            ext_now = (index == 8'd0) ? ext_ref_sync[1] : cfg_ext;
 
     
 always @ (posedge clk or negedge rst_n)begin
@@ -53,7 +66,9 @@ always @ (posedge clk or negedge rst_n)begin
     else 
         case (state)    
             3'd0    :   begin 
-                            spi_wr_data <= ADF4001_lut(index);
+                            if(index == 8'd0)
+                                cfg_ext <= ext_ref_sync[1];
+                            spi_wr_data <= ADF4001_lut(index, ext_now);
                             spi_wr_en   <= 1'b0;	
                             state 		<= 3'd1;
             end  
@@ -89,8 +104,14 @@ always @ (posedge clk or negedge rst_n)begin
                             end
                         end                        
             3'd5    :   begin 
-                            state <= state;
                             init_done <= 1'b1;
+                            cp_active <= cfg_ext;
+                            //reference selection changed: reprogram
+                            if(ext_ref_sync[1] != cfg_ext) begin
+                                init_done <= 1'b0;
+                                index     <= 8'd0;
+                                state     <= 3'd0;
+                            end
                         end
                         
             default :   state <= 3'd0;
@@ -101,11 +122,15 @@ end
 
 function [23:0] ADF4001_lut;
     input [7:0] index;              //输入索引
+    input       ext;                //0: CP three-state (DB8)
     reg [23:0] ADF4001_lut_d;       //中间变量
     begin
         case(index)
-            8'd0:  ADF4001_lut_d = 24'h1F_8093;		
-            8'd1:  ADF4001_lut_d = 24'h1F_8092;	 			
+            //init/function latch: MUXOUT = R divider output (M3..M1 =
+            //100, read by ADF4001_refdet), CP current max,
+            //DB8 = CP three-state when !ext
+            8'd0:  ADF4001_lut_d = ext ? 24'h1F_80C3 : 24'h1F_81C3;
+            8'd1:  ADF4001_lut_d = ext ? 24'h1F_80C2 : 24'h1F_81C2;
             8'd2:  ADF4001_lut_d = 24'h00_0004;                                          
             8'd3:  ADF4001_lut_d = 24'h00_0401;	
         endcase   

@@ -141,6 +141,7 @@ set_property  -dict {PACKAGE_PIN  B15   IOSTANDARD LVCMOS25} [get_ports MDIO_PHY
 set_property -dict {PACKAGE_PIN AB22 IOSTANDARD LVCMOS33} [get_ports pll_le]
 set_property -dict {PACKAGE_PIN AB21 IOSTANDARD LVCMOS33} [get_ports pll_clk]
 set_property -dict {PACKAGE_PIN AA21 IOSTANDARD LVCMOS33} [get_ports pll_mosi]
+set_property -dict {PACKAGE_PIN AA22 IOSTANDARD LVCMOS33} [get_ports pll_muxout]
 set_property -dict {PACKAGE_PIN Y19  IOSTANDARD LVCMOS33} [get_ports i_clk]
 
 
@@ -185,6 +186,16 @@ create_clock -name spi0_clk      -period 40   [get_pins -hier */EMIOSPI0SCLKO]
 
 # AD9361 DATA_CLK on AA7 (IO_L14P_T2_SRCC_13) — SRCC, dedicated route valid
 create_clock -name rx_clk        -period  4   [get_ports rx_clk_in_p]
+
+# CLK_40M_FPGA from the VCTCXO (Y19 = IO_L11P_T1_SRCC_33)
+create_clock -name clk_40m       -period 25   [get_ports i_clk]
+
+# ADF4001 MUXOUT = R divider output (10 MHz with the reference present),
+# counted by ADF4001_refdet. AA22 is not clock capable; at 10 MHz the
+# general routing to the BUFG is fine.
+create_clock -name pll_muxout    -period 50   [get_ports pll_muxout]
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -of_objects [get_ports pll_muxout]]
+set_clock_groups -asynchronous -group [get_clocks clk_40m] -group [get_clocks pll_muxout]
 
 # RGMII recovered clock from RTL8211F (125 MHz at 1 Gbps)
 # B19 = IO_L13N_T2_MRCC_35 — MRCC-capable, dedicated route valid

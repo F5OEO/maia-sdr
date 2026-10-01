@@ -25,6 +25,7 @@ add_files -norecurse  $::tezuka_hdl_dir/boards/fishball7020/vcxo_ctrl.v
 add_files -norecurse  $::tezuka_hdl_dir/common/mux_enable.v
 add_files -norecurse  $::tezuka_hdl_dir/boards/plutoskyr2/ADF4001_init.v
 add_files -norecurse  $::tezuka_hdl_dir/boards/plutoskyr2/ADF4001_spi_drive.v
+add_files -norecurse  $::tezuka_hdl_dir/boards/plutoskyr2/ADF4001_refdet.v
 if {[info exists xo_corrector]} {
   add_files -norecurse  $::tezuka_hdl_dir/common/iq_xo_corrector.v
   add_files -norecurse -fileset constrs_1 \
