@@ -988,6 +988,8 @@ module"]
         pub type RecorderR = crate::BitReader;
         #[doc = "Field `raw_capture` reader - raw_capture"]
         pub type RawCaptureR = crate::BitReader;
+        #[doc = "Field `iq_waterfall` reader - iq_waterfall"]
+        pub type IqWaterfallR = crate::BitReader;
         impl R {
             #[doc = "Bit 0 - spectrometer"]
             #[inline(always)]
@@ -1003,6 +1005,11 @@ module"]
             #[inline(always)]
             pub fn raw_capture(&self) -> RawCaptureR {
                 RawCaptureR::new(((self.bits >> 2) & 1) != 0)
+            }
+            #[doc = "Bit 3 - iq_waterfall"]
+            #[inline(always)]
+            pub fn iq_waterfall(&self) -> IqWaterfallR {
+                IqWaterfallR::new(((self.bits >> 3) & 1) != 0)
             }
         }
         #[doc = "interrupts\n\nYou can [`read`](crate::Reg::read) this register and get [`interrupts::R`](R). See [API](https://docs.rs/svd2rust/#read--modify--write-api)."]
@@ -1130,6 +1137,8 @@ module"]
         pub type PeakDetectR = crate::BitReader;
         #[doc = "Field `peak_detect` writer - peak_detect"]
         pub type PeakDetectW<'a, REG> = crate::BitWriter<'a, REG>;
+        #[doc = "Field `iq_last_buffer` reader - iq_last_buffer"]
+        pub type IqLastBufferR = crate::FieldReader;
         impl R {
             #[doc = "Bit 0 - use_ddc_out"]
             #[inline(always)]
@@ -1150,6 +1159,11 @@ module"]
             #[inline(always)]
             pub fn peak_detect(&self) -> PeakDetectR {
                 PeakDetectR::new(((self.bits >> 15) & 1) != 0)
+            }
+            #[doc = "Bits 16:18 - iq_last_buffer"]
+            #[inline(always)]
+            pub fn iq_last_buffer(&self) -> IqLastBufferR {
+                IqLastBufferR::new(((self.bits >> 16) & 7) as u8)
             }
         }
         impl W {

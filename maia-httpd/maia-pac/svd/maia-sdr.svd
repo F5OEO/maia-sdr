@@ -106,6 +106,12 @@
               <bitRange>[2:2]</bitRange>
               <access>read-only</access>
             </field>
+            <field>
+              <name>iq_waterfall</name>
+              <description>iq_waterfall</description>
+              <bitRange>[3:3]</bitRange>
+              <access>read-only</access>
+            </field>
           </fields>
         </register>
         <register>
@@ -189,6 +195,12 @@
               <description>peak_detect</description>
               <bitRange>[15:15]</bitRange>
               <access>read-write</access>
+            </field>
+            <field>
+              <name>iq_last_buffer</name>
+              <description>iq_last_buffer</description>
+              <bitRange>[18:16]</bitRange>
+              <access>read-only</access>
             </field>
           </fields>
         </register>
