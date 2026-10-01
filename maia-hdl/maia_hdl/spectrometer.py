@@ -152,7 +152,8 @@ class Spectrometer(Elaboratable):
     def ports(self):
         ports = self.dma.axi.ports() + [
             self.strobe_in,
-            self.common_edge,
+            self.common_edge_2x,
+            self.common_edge_3x,
             self.re_in,
             self.im_in,
             self.number_integrations,
