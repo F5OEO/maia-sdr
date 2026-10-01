@@ -52,6 +52,12 @@ class Spectrometer(Elaboratable):
     raw_dma_end_address : Optional[int]
         End address for the raw complex capture's DmaStreamWrite. Required
         if raw_dma_base_address is given.
+    raw_dma_domain_dma : str
+        Clock domain for the raw complex capture's DMA and control
+        interface (the Recorder16IQ's domain_dma). Defaults to 'sync';
+        pass the domain of whatever register file will drive
+        capture_start/capture_stop and read capture_finished/
+        capture_next_address, to avoid needing a separate CDC for those.
 
     Attributes
     ----------
@@ -97,7 +103,8 @@ class Spectrometer(Elaboratable):
     """
     def __init__(self, dma_base_address, dma_buffers_log2, dma_name=None,
                  domain_2x='clk2x', domain_3x='clk3x',
-                 raw_dma_base_address=None, raw_dma_end_address=None):
+                 raw_dma_base_address=None, raw_dma_end_address=None,
+                 raw_dma_domain_dma='sync'):
         self._domain_2x = domain_2x
         self._domain_3x = domain_3x
         self.fft_order_log2 = 12
@@ -134,7 +141,7 @@ class Spectrometer(Elaboratable):
             self.raw_capture = Recorder16IQ(
                 raw_dma_base_address, raw_dma_end_address,
                 dma_name=raw_dma_name,
-                domain_in=self._domain_3x, domain_dma='sync')
+                domain_in=self._domain_3x, domain_dma=raw_dma_domain_dma)
             self.capture_start = Signal()
             self.capture_stop = Signal()
             self.capture_finished = Signal()
