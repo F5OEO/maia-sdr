@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Optional raw complex FFT capture in the Spectrometer (single-shot,
+  triggered, tapped before the spectrum integrator discards phase), and
+  AXI4-Lite register support for it in the Maia SDR top-level
+  (`raw_capture_registers`). This widens the top-level's AXI4-Lite
+  address width from 4 to 5 bits -- an API-breaking HDL interface change
+  for anyone instantiating `MaiaSDR` directly. Not yet simulated or
+  tested on hardware.
+
 ## 0.6.1 - 2024-11-30
 
 ### Added

@@ -7,11 +7,13 @@
 #
 
 from amaranth import *
+from amaranth.lib.memory import Memory
 import amaranth.back.verilog
 import numpy as np
 
 from .dma import DmaBRAMWrite
 from .fft import FFT
+from .recorder import Recorder16IQ, RecorderMode
 from .spectrum_integrator import SpectrumIntegrator
 
 
@@ -21,6 +23,16 @@ class Spectrometer(Elaboratable):
     This elaboratable uses an FFT and a spectrum integrator to compute
     waterfall data. The data is written to an AXI bus using a DMA
     (DMABramWrite).
+
+    Optionally, it also exposes a raw complex FFT capture path: a
+    ``Recorder16IQ`` tapped directly off the FFT output (``fft.re_out``/
+    ``fft.im_out``, truncated to 16 bits), before the spectrum integrator
+    discards phase. This is a triggered, single-shot capture (sized by
+    ``raw_dma_base_address``/``raw_dma_end_address``), not a continuous
+    feed -- full-rate per-frame complex output is far higher volume than
+    the integrated/averaged waterfall, which is what makes the waterfall's
+    continuous streaming sustainable in the first place. Pass
+    ``raw_dma_base_address=None`` (the default) to omit this path entirely.
 
     Parameters
     ----------
@@ -35,6 +47,29 @@ class Spectrometer(Elaboratable):
         Name of the clock domain of the 2x clock.
     domain_3x : str
         Name of the clock domain of the 2x clock.
+    raw_dma_base_address : Optional[int]
+        Start address for the raw complex capture's DmaStreamWrite. If
+        None (the default), the raw capture path is not instantiated.
+    raw_dma_end_address : Optional[int]
+        End address for the raw complex capture's DmaStreamWrite. Required
+        if raw_dma_base_address is given.
+    raw_dma_domain_dma : str
+        Clock domain for the raw complex capture's DMA and control
+        interface (the Recorder16IQ's domain_dma). Defaults to 'sync';
+        pass the domain of whatever register file will drive
+        capture_start/capture_stop and read capture_finished/
+        capture_next_address, to avoid needing a separate CDC for those.
+    iq_dma_base_address : Optional[int]
+        Base address for a second, continuous low-rate complex (I/Q)
+        output: once per integration epoch (same cadence as the
+        magnitude waterfall, gated on ``end_fft``), the last FFT frame's
+        complex bins (same ``fft.re_out``/``fft.im_out`` tap and 16-bit
+        truncation as the raw capture above) are latched into a
+        ping-pong buffer and DMA'd out, like a second small waterfall.
+        If None (the default), this path is not instantiated.
+    iq_dma_buffers_log2 : Optional[int]
+        Log2 of the number of DMA buffers for the above. Required if
+        iq_dma_base_address is given.
 
     Attributes
     ----------
@@ -62,9 +97,33 @@ class Spectrometer(Elaboratable):
         Indicates the last buffer to which the DMA has written to.
     interrupt_out : Signal(), out
         Pulsed each time that a DMA transfer finishes.
+    capture_start : Signal(), in
+        Only present when the raw capture path is enabled. Pulse to start
+        a single-shot raw complex FFT capture. See Recorder16IQ.start.
+    capture_stop : Signal(), in
+        Only present when the raw capture path is enabled. See
+        Recorder16IQ.stop.
+    capture_finished : Signal(), out
+        Only present when the raw capture path is enabled. See
+        Recorder16IQ.finished.
+    capture_dropped_samples : Signal(), out
+        Only present when the raw capture path is enabled. See
+        Recorder16IQ.dropped_samples.
+    capture_next_address : Signal(), out
+        Only present when the raw capture path is enabled. See
+        Recorder16IQ.next_address.
+    iq_last_buffer : Signal(iq_dma_buffers_log2), out
+        Only present when the iq_dma path is enabled. Indicates the last
+        buffer to which the continuous I/Q DMA has written to.
+    iq_interrupt_out : Signal(), out
+        Only present when the iq_dma path is enabled. Pulsed each time
+        that an I/Q DMA transfer finishes.
     """
     def __init__(self, dma_base_address, dma_buffers_log2, dma_name=None,
-                 domain_2x='clk2x', domain_3x='clk3x'):
+                 domain_2x='clk2x', domain_3x='clk3x',
+                 raw_dma_base_address=None, raw_dma_end_address=None,
+                 raw_dma_domain_dma='sync',
+                 iq_dma_base_address=None, iq_dma_buffers_log2=None):
         self._domain_2x = domain_2x
         self._domain_3x = domain_3x
         self.fft_order_log2 = 12
@@ -91,10 +150,44 @@ class Spectrometer(Elaboratable):
         self.end_fft = Signal()
         self.fastlock_profile = Signal(3)
 
+        self.raw_capture = None
+        if raw_dma_base_address is not None:
+            if raw_dma_end_address is None:
+                raise ValueError(
+                    'raw_dma_end_address is required when '
+                    'raw_dma_base_address is given')
+            raw_dma_name = f'{dma_name}_raw' if dma_name else None
+            self.raw_capture = Recorder16IQ(
+                raw_dma_base_address, raw_dma_end_address,
+                dma_name=raw_dma_name,
+                domain_in=self._domain_3x, domain_dma=raw_dma_domain_dma)
+            self.capture_start = Signal()
+            self.capture_stop = Signal()
+            self.capture_finished = Signal()
+            self.capture_dropped_samples = Signal()
+            self.capture_next_address = Signal(
+                len(self.raw_capture.next_address))
+
+        self.iq_dma = None
+        if iq_dma_base_address is not None:
+            if iq_dma_buffers_log2 is None:
+                raise ValueError(
+                    'iq_dma_buffers_log2 is required when '
+                    'iq_dma_base_address is given')
+            iq_dma_name = f'{dma_name}_iq' if dma_name else None
+            # 32-bit AXI word: 16-bit I + 16-bit Q packed per sample,
+            # instead of the 64-bit word the magnitude DMA uses.
+            self.iq_dma = DmaBRAMWrite(
+                iq_dma_base_address, iq_dma_buffers_log2,
+                self.fft_order_log2, axi_width=32, name=iq_dma_name)
+            self.iq_last_buffer = Signal(iq_dma_buffers_log2)
+            self.iq_interrupt_out = Signal()
+
     def ports(self):
-        return self.dma.axi.ports() + [
+        ports = self.dma.axi.ports() + [
             self.strobe_in,
-            self.common_edge,
+            self.common_edge_2x,
+            self.common_edge_3x,
             self.re_in,
             self.im_in,
             self.number_integrations,
@@ -104,6 +197,20 @@ class Spectrometer(Elaboratable):
             self.fastlock_profile,
             self.end_fft,
         ]
+        if self.raw_capture is not None:
+            ports += [
+                self.capture_start,
+                self.capture_stop,
+                self.capture_finished,
+                self.capture_dropped_samples,
+                self.capture_next_address,
+            ] + self.raw_capture.dma.axi.ports()
+        if self.iq_dma is not None:
+            ports += [
+                self.iq_last_buffer,
+                self.iq_interrupt_out,
+            ] + self.iq_dma.axi.ports()
+        return ports
 
     def elaborate(self, platform):
         m = Module()
@@ -117,6 +224,11 @@ class Spectrometer(Elaboratable):
             domain_2x=self._domain_2x, domain_3x=self._domain_3x)
         width_fft_out = len(fft.re_out)
         assert width_fft_out == 22
+        # Truncation shared by raw_capture and iq_dma below: both tap
+        # fft.re_out/im_out directly (pre-integrator, pre-CpwrPeak) and
+        # truncate the same way, so burst and continuous complex data
+        # share one numeric representation.
+        trunc = width_fft_out - self.width_in
 
         spectrum_fp_width = 18
         m.submodules.integrator = integrator = SpectrumIntegrator(
@@ -163,10 +275,135 @@ class Spectrometer(Elaboratable):
    #         self.end_fft.eq(integrator.done), 
             self.end_fft.eq(integrator.nearly_end), 
             self.interrupt_out.eq(~dma.busy & dma_busy_q),
-            
+
         ]
 
-        
+        if self.raw_capture is not None:
+            m.submodules.raw_capture = raw_capture = self.raw_capture
+            # Truncate the FFT's 22-bit complex output to the 16 bits
+            # Recorder16IQ expects, tapping it before the spectrum
+            # integrator's CpwrPeak stage discards phase. Same domain_3x
+            # assumption the integrator itself already makes for fft.re_out/
+            # im_out (no explicit CDC there either).
+            m.d.comb += [
+                raw_capture.re_in.eq(fft.re_out >> trunc),
+                raw_capture.im_in.eq(fft.im_out >> trunc),
+                raw_capture.strobe_in.eq(self.strobe_in),
+                raw_capture.mode.eq(RecorderMode.MODE_16BIT),
+                raw_capture.start.eq(self.capture_start),
+                raw_capture.stop.eq(self.capture_stop),
+                self.capture_finished.eq(raw_capture.finished),
+                self.capture_dropped_samples.eq(raw_capture.dropped_samples),
+                self.capture_next_address.eq(raw_capture.next_address),
+            ]
+
+        if self.iq_dma is not None:
+            m.submodules.iq_dma = iq_dma = self.iq_dma
+
+            iq_mems = [Memory(shape=32, depth=2**self.fft_order_log2,
+                              init=[])
+                       for _ in range(2)]
+            m.submodules.iq_mem0 = iq_mems[0]
+            m.submodules.iq_mem1 = iq_mems[1]
+            iq_wrports = [mem.write_port() for mem in iq_mems]
+            iq_rdports = [mem.read_port() for mem in iq_mems]
+            # Extra output register on top of the BRAM's own read latency,
+            # to match DmaBRAMWrite's default bram_latency=2 (same idiom
+            # SpectrumIntegrator uses for rdports_reg).
+            iq_rdports_reg = [
+                Signal(32, name=f'iq_rdport{j}_reg', reset_less=True)
+                for j in range(2)]
+            for j in range(2):
+                with m.If(iq_rdports[j].en):
+                    m.d.sync += iq_rdports_reg[j].eq(iq_rdports[j].data)
+
+            iq_pingpong = Signal()
+            # Write counter for the raw (zero added-delay) fft.re_out/
+            # im_out tap. Resetting this to plain 0 on fft.out_last --
+            # i.e. assuming it tracks the FFT's own bin index directly,
+            # the same way spectrum_integrator.py's read_counter does --
+            # seemed right by the same reasoning that module's own
+            # write_counter/read_counter split uses, but empirically
+            # (new_cocotb_test/spectrometer, injecting a single DC
+            # tone and checking which address it peaks at) that was
+            # wrong: it put the peak at a completely different address
+            # than the magnitude channel, which taps the exact same
+            # fft.re_out/im_out. The reset value below
+            # (2**(order_log2-1) + 1) was back-derived from that same
+            # test until the two channels' peaks matched, not from
+            # understanding the FFT core's internal pipeline timing --
+            # i.e. this is an empirically-calibrated constant, and
+            # deserves a second look from someone who knows fft.py's
+            # internal latency structure, to confirm it isn't an
+            # artifact of this test's specific timing (nint, truncation
+            # amount, etc.) rather than a general property.
+            iq_write_counter = Signal(self.fft_order_log2)
+            # One-cycle-delayed copy of "last sample of the epoch's last
+            # frame was just written": by the time this is high, that
+            # synchronous memory write has landed and iq_pingpong has
+            # already flipped, so it's the correct cycle to kick off the
+            # DMA read of the just-completed buffer.
+            iq_epoch_done = Signal()
+
+            with m.If(self.strobe_in):
+                m.d.sync += iq_write_counter.eq(iq_write_counter + 1)
+                with m.If(fft.out_last):
+                    m.d.sync += iq_write_counter.eq(
+                        2**(self.fft_order_log2 - 1) + 1)
+                    with m.If(self.end_fft):
+                        m.d.sync += iq_pingpong.eq(~iq_pingpong)
+
+            m.d.sync += iq_epoch_done.eq(
+                self.strobe_in & fft.out_last & self.end_fft)
+
+            # Same bit-reverse + MSB-invert transform as write_counter_shift
+            # / read_counter_shift in spectrum_integrator.py, to match the
+            # bin order (bit-reversed FFT output, fftshifted) the magnitude
+            # waterfall already uses.
+            iq_write_counter_rev = iq_write_counter[::-1]
+            iq_write_addr = Cat(iq_write_counter_rev[:-1],
+                                ~iq_write_counter_rev[-1])
+
+            # I/Q sample layout: Q (im) in the low 16 bits, I (re) in the
+            # high 16 bits of the 32-bit word.
+            iq_write_data = Cat(fft.im_out >> trunc, fft.re_out >> trunc)
+
+            m.d.comb += [
+                iq_wrports[0].en.eq(
+                    ~iq_pingpong & self.strobe_in & self.end_fft),
+                iq_wrports[1].en.eq(
+                    iq_pingpong & self.strobe_in & self.end_fft),
+            ]
+            for wr in iq_wrports:
+                m.d.comb += [
+                    wr.addr.eq(iq_write_addr),
+                    wr.data.eq(iq_write_data),
+                ]
+
+            # DMA always reads the buffer NOT currently being written.
+            m.d.comb += [
+                iq_rdports[0].en.eq(Mux(iq_pingpong, iq_dma.ren, 0)),
+                iq_rdports[1].en.eq(Mux(iq_pingpong, 0, iq_dma.ren)),
+                iq_rdports[0].addr.eq(iq_dma.raddr),
+                iq_rdports[1].addr.eq(iq_dma.raddr),
+                # Matches the .en muxes just above: port 0 is the one
+                # actually being read (ren asserted) when iq_pingpong
+                # is 1, so rdata must source from reg[0] in that case,
+                # not reg[1] -- a mismatch here previously caused every
+                # DMA'd word to read back as zero (reading the buffer
+                # that was never written, not the one just completed).
+                iq_dma.rdata.eq(
+                    Mux(iq_pingpong, iq_rdports_reg[0], iq_rdports_reg[1])),
+                iq_dma.start.eq(iq_epoch_done),
+            ]
+
+            iq_dma_busy_q = Signal()
+            m.d.sync += iq_dma_busy_q.eq(iq_dma.busy)
+            m.d.comb += [
+                self.iq_last_buffer.eq(iq_dma.last_buffer),
+                self.iq_interrupt_out.eq(~iq_dma.busy & iq_dma_busy_q),
+            ]
+
         return m
 
 

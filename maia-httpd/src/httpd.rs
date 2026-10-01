@@ -24,6 +24,7 @@ mod api;
 mod ddc;
 mod geolocation;
 mod iqengine;
+mod raw_capture;
 mod recording;
 mod spectrometer;
 mod time;
@@ -31,6 +32,7 @@ mod version;
 mod websocket;
 mod zeros;
 
+pub use raw_capture::{RawCaptureFinishWaiter, RawCaptureState};
 pub use recording::{RecorderFinishWaiter, RecorderState};
 
 /// HTTP server.
@@ -56,10 +58,13 @@ impl Server {
     /// shared access to update the sample rate of the spectrometer. The
     /// `waiter_recorder` is the interrupt waiter for the IQ recorder, which is
     /// contolled by the HTTP server. The `waterfall_sender` is used to obtain
-    /// waterfall channel receivers for the websocket server.
+    /// waterfall channel receivers for the websocket server, and
+    /// `iq_waterfall_sender` does the same for the continuous I/Q waterfall
+    /// channel.
     ///
     /// After calling this function, the server needs to be run by calling
     /// [`Server::run`].
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         http_address: SocketAddr,
         https_address: SocketAddr,
@@ -68,6 +73,7 @@ impl Server {
         ca_cert: Option<impl AsRef<Path>>,
         state: AppState,
         waterfall_sender: broadcast::Sender<Bytes>,
+        iq_waterfall_sender: broadcast::Sender<Bytes>,
     ) -> Result<Server> {
         let mut app = Router::new()
             // all the following routes have .with_state(state)
@@ -97,6 +103,11 @@ impl Server {
                 "/api/recorder",
                 get(recording::get_recorder).patch(recording::patch_recorder),
             )
+            .route(
+                "/api/raw-capture",
+                get(raw_capture::get_raw_capture).patch(raw_capture::patch_raw_capture),
+            )
+            .route("/raw-capture", get(raw_capture::get_raw_capture_data))
             .route(
                 "/api/recording/metadata",
                 get(recording::get_recording_metadata)
@@ -130,6 +141,10 @@ impl Server {
             .route(
                 "/waterfall",
                 get(websocket::handler).with_state(waterfall_sender),
+            )
+            .route(
+                "/iq-waterfall",
+                get(websocket::handler).with_state(iq_waterfall_sender),
             )
             .route("/zeros", get(zeros::get_zeros)); // used for benchmarking
         if let Some(ca_cert) = &ca_cert {

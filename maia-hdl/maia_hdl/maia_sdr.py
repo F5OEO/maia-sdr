@@ -36,7 +36,12 @@ class MaiaSDR(Elaboratable):
     def __init__(self, config=MaiaSDRConfig()):
         config.validate()
         self.config = config
-        self.axi4_awidth = 4
+        # Widened from 4 to 5 to make room for raw_capture_registers
+        # (bit 4 selects it; existing control/recorder/sdr decode on bits
+        # 3:2 is unchanged). This grows the AXI4-Lite slave port's address
+        # width by one bit -- a hardware interface change, needs
+        # re-packaging/review on the Vivado side, not just HDL.
+        self.axi4_awidth = 5
         self.s_axi_lite = ClockDomain()
         self.sampling = ClockDomain()
         # A clock domain called 'sync' is added to override the default
@@ -71,6 +76,8 @@ class MaiaSDR(Elaboratable):
                 0b11: Register('interrupts', [
                     Field('spectrometer', Access.Rsticky, 1, 0),
                     Field('recorder', Access.Rsticky, 1, 0),
+                    Field('raw_capture', Access.Rsticky, 1, 0),
+                    Field('iq_waterfall', Access.Rsticky, 1, 0),
                 ], interrupt=True),
             },
             2)
@@ -89,10 +96,32 @@ class MaiaSDR(Elaboratable):
                 ]),
             },
             1)
+        # Raw complex FFT capture: single-shot, triggered, tapped before
+        # the spectrum integrator discards phase (see Spectrometer's
+        # raw_capture). No 'mode' field: Spectrometer always runs its
+        # internal Recorder16IQ in MODE_16BIT.
+        self.raw_capture_registers = Registers(
+            'raw_capture',
+            {
+                0b0: Register('raw_capture_control', [
+                    Field('start', Access.Wpulse, 1, 0),
+                    Field('stop', Access.Wpulse, 1, 0),
+                    Field('dropped_samples', Access.R, 1, 0),
+                ]),
+                0b1: Register('raw_capture_next_address', [
+                    Field('next_address', Access.R, 32, 0),
+                ]),
+            },
+            1)
         self.spectrometer = Spectrometer(
             config.spectrometer_address,
             config.spectrometer_buffers.bit_length() - 1,
-            dma_name='m_axi_spectrometer')
+            dma_name='m_axi_spectrometer',
+            raw_dma_base_address=config.raw_capture_address_range[0],
+            raw_dma_end_address=config.raw_capture_address_range[1],
+            raw_dma_domain_dma='s_axi_lite',
+            iq_dma_base_address=config.iq_waterfall_address_range[0],
+            iq_dma_buffers_log2=config.spectrometer_buffers.bit_length() - 1)
         self.recorder = Recorder16IQ(
             config.recorder_address_range[0],
             config.recorder_address_range[1],
@@ -120,6 +149,10 @@ class MaiaSDR(Elaboratable):
                         Field('peak_detect',
                               Access.RW,
                               1,
+                              0),
+                        Field('iq_last_buffer',
+                              Access.R,
+                              len(self.spectrometer.iq_last_buffer),
                               0),
                     ]),
                 0b001: Register(
@@ -217,6 +250,7 @@ class MaiaSDR(Elaboratable):
             0x0: self.control_registers,
             0x10: self.recorder_registers,
             0x20: self.sdr_registers,
+            0x40: self.raw_capture_registers,
         }, metadata)
 
         self.iq_in_width = 12
@@ -238,6 +272,8 @@ class MaiaSDR(Elaboratable):
             self.axi4lite.axi.ports()
             + self.spectrometer.dma.axi.ports()
             + self.recorder.dma.axi.ports()
+            + self.spectrometer.raw_capture.dma.axi.ports()
+            + self.spectrometer.iq_dma.axi.ports()
             + [
                 self.re_in,
                 self.im_in,
@@ -276,11 +312,16 @@ class MaiaSDR(Elaboratable):
             self.control_registers)
         m.submodules.recorder_registers = s_axi_lite_renamer(
             self.recorder_registers)
+        m.submodules.raw_capture_registers = s_axi_lite_renamer(
+            self.raw_capture_registers)
         m.submodules.spectrometer = self.spectrometer
         m.submodules.sync_spectrometer_interrupt = \
             sync_spectrometer_interrupt = PulseSynchronizer(
                 i_domain='sync', o_domain='s_axi_lite')
-       
+        m.submodules.sync_iq_waterfall_interrupt = \
+            sync_iq_waterfall_interrupt = PulseSynchronizer(
+                i_domain='sync', o_domain='s_axi_lite')
+
         m.submodules.recorder = self.recorder
         m.submodules.ddc = self.ddc
         m.submodules.sdr_registers = self.sdr_registers
@@ -349,6 +390,10 @@ class MaiaSDR(Elaboratable):
             self.spectrometer.re_in.eq(spectrometer_re_in),
             self.spectrometer.im_in.eq(spectrometer_im_in),
             sync_spectrometer_interrupt.i.eq(self.spectrometer.interrupt_out),
+            sync_iq_waterfall_interrupt.i.eq(
+                self.spectrometer.iq_interrupt_out),
+            self.sdr_registers['spectrometer']['iq_last_buffer'].eq(
+                self.spectrometer.iq_last_buffer),
             self.spectrometer.number_integrations.eq(
                 self.sdr_registers['spectrometer']['num_integrations']),
             self.spectrometer.abort.eq(
@@ -362,6 +407,21 @@ class MaiaSDR(Elaboratable):
               
               
 
+        ]
+
+        # Raw complex FFT capture (s_axi_lite domain; the Spectrometer's
+        # internal Recorder16IQ was built with domain_dma='s_axi_lite',
+        # so this needs no CDC here, same as the recorder wiring below)
+        m.d.comb += [
+            self.spectrometer.capture_start.eq(
+                self.raw_capture_registers['raw_capture_control']['start']),
+            self.spectrometer.capture_stop.eq(
+                self.raw_capture_registers['raw_capture_control']['stop']),
+            (self.raw_capture_registers['raw_capture_control']
+             ['dropped_samples'].eq(
+                 self.spectrometer.capture_dropped_samples)),
+            (self.raw_capture_registers['raw_capture_next_address']
+             ['next_address'].eq(self.spectrometer.capture_next_address)),
         ]
 
         # Recorder
@@ -425,20 +485,27 @@ class MaiaSDR(Elaboratable):
         # TODO: convert all of this into a RegisterCrossbar module
         address = Signal(self.axi4_awidth, reset_less=True)
         wdata = Signal(32, reset_less=True)
-        sdr_regs_select = self.axi4lite.address[3] == 1
+        raw_capture_regs_select = self.axi4lite.address[4] == 1
+        sdr_regs_select = (
+            ~raw_capture_regs_select & (self.axi4lite.address[3] == 1))
         recorder_regs_select = (
-            ~sdr_regs_select & (self.axi4lite.address[2] == 1))
+            ~raw_capture_regs_select & ~sdr_regs_select
+            & (self.axi4lite.address[2] == 1))
         control_regs_select = (
-            ~sdr_regs_select & (self.axi4lite.address[2] == 0))
+            ~raw_capture_regs_select & ~sdr_regs_select
+            & (self.axi4lite.address[2] == 0))
         m.d.s_axi_lite += [
             self.axi4lite.rdata.eq(self.control_registers.rdata
                                    | self.recorder_registers.rdata
+                                   | self.raw_capture_registers.rdata
                                    | sdr_registers_cdc.i_rdata),
             self.axi4lite.rdone.eq(self.control_registers.rdone
                                    | self.recorder_registers.rdone
+                                   | self.raw_capture_registers.rdone
                                    | sdr_registers_cdc.i_rdone),
             self.axi4lite.wdone.eq(self.control_registers.wdone
                                    | self.recorder_registers.wdone
+                                   | self.raw_capture_registers.wdone
                                    | sdr_registers_cdc.i_wdone),
             self.control_registers.ren.eq(
                 self.axi4lite.ren & control_regs_select),
@@ -448,6 +515,10 @@ class MaiaSDR(Elaboratable):
                 self.axi4lite.ren & recorder_regs_select),
             self.recorder_registers.wstrobe.eq(
                 Mux(recorder_regs_select, self.axi4lite.wstrobe, 0)),
+            self.raw_capture_registers.ren.eq(
+                self.axi4lite.ren & raw_capture_regs_select),
+            self.raw_capture_registers.wstrobe.eq(
+                Mux(raw_capture_regs_select, self.axi4lite.wstrobe, 0)),
             sdr_registers_cdc.i_ren.eq(
                 self.axi4lite.ren & sdr_regs_select),
             sdr_registers_cdc.i_wstrobe.eq(
@@ -460,6 +531,8 @@ class MaiaSDR(Elaboratable):
             self.control_registers.wdata.eq(wdata),
             self.recorder_registers.address.eq(address),
             self.recorder_registers.wdata.eq(wdata),
+            self.raw_capture_registers.address.eq(address),
+            self.raw_capture_registers.wdata.eq(wdata),
             sdr_registers_cdc.i_address.eq(address),
             sdr_registers_cdc.i_wdata.eq(wdata),
         ]
@@ -494,6 +567,10 @@ class MaiaSDR(Elaboratable):
             self.interrupt_out.eq(interrupts_reg.interrupt),
             interrupts_reg['spectrometer'].eq(sync_spectrometer_interrupt.o),
             interrupts_reg['recorder'].eq(self.recorder.finished),
+            interrupts_reg['raw_capture'].eq(
+                self.spectrometer.capture_finished),
+            interrupts_reg['iq_waterfall'].eq(
+                sync_iq_waterfall_interrupt.o),
         ]
 
         return m
