@@ -32,6 +32,8 @@
 //
 // ***************************************************************************
 // ***************************************************************************
+// Modified by Christos Nikolaou (SV1EIA) 2026.
+// Christos Nikolaou can be reached by email at : sv1eia@gmail.com
 
 `timescale 1ns/100ps
 
@@ -119,20 +121,32 @@ module system_top (
 
   // instantiations
   assign gpio_i[16:14] = gpio_o[16:14]; //Reserved
-  // ADF4001 reference selection (EMIO, Linux gpio 54 + n):
-  //   o[32] force external, o[34] force internal, neither: auto-detect
-  //   i[33] 10 MHz present, i[35] charge pump active, i[51:36] edge count
+  // ADF4001 reference control (EMIO, Linux gpio 54 + n):
+  //   o[32] force external, o[34] force internal, neither: automatic
+  //   i[33] 10 MHz present, i[35] charge pump active, i[51:36] edge count,
+  //   i[52] PLL locked, i[54:53] controller state
+  //   (0 absent, 1 acquire, 2 locked, 3 recheck); see ADF4001_refctl.v
   wire          ref_present;
+  wire          ref_window;
+  wire          ref_good;
+  wire          ref_locked;
+  wire  [1:0]   ref_state;
+  wire          ref_present_out;
   wire          pll_cp_active;
+  wire  [1:0]   pll_mux_is;
+  wire          pll_cfg_done;
+  wire          ref_cp_req;
+  wire  [1:0]   ref_mux_req;
+  wire          ref_det_enable;
   wire  [15:0]  ref_count;
-  wire          ref_use = gpio_o[34] ? 1'b0 :
-                          gpio_o[32] ? 1'b1 : ref_present;
 
-  assign gpio_i[63:52] = gpio_o[63:52];
+  assign gpio_i[63:55] = gpio_o[63:55];
+  assign gpio_i[54:53] = ref_state;
+  assign gpio_i[52]    = ref_locked;
   assign gpio_i[51:36] = ref_count;
   assign gpio_i[35]    = pll_cp_active;
   assign gpio_i[34]    = gpio_o[34];
-  assign gpio_i[33]    = ref_present;
+  assign gpio_i[33]    = ref_present_out;
   assign gpio_i[32:31] = gpio_o[32:31];
   
  
@@ -228,12 +242,21 @@ always @(posedge i_clk) begin
     end
 end
 
+// init_done is produced on the 5 MHz SPI clock (a divided copy of i_clk):
+// two flops bring it into the i_clk domain.
+(* ASYNC_REG = "TRUE" *) reg [1:0] cfg_done_sync = 2'b00;
+always @(posedge i_clk)
+    cfg_done_sync <= {cfg_done_sync[0], pll_cfg_done};
+
 ADF4001_init ADF4001_INIT_U(
 //系统时钟复位
 	.clk            (adf4001_spi_clk),
 	.rst_n          (1'b1),
-	.ext_ref_en     (ref_use),
+	.ext_ref_en     (ref_cp_req),
+	.mux_sel        (ref_mux_req),
 	.cp_active      (pll_cp_active),
+	.mux_is         (pll_mux_is),
+	.init_done      (pll_cfg_done),
 
 	.SPI_LE         (pll_le   ),
 	.SPI_SCLK       (pll_clk  ),
@@ -243,8 +266,28 @@ ADF4001_init ADF4001_INIT_U(
 ADF4001_refdet i_adf4001_refdet (
 	.clk            (i_clk),
 	.muxout         (pll_muxout),
+	.enable         (ref_det_enable),
 	.present        (ref_present),
-	.count          (ref_count)
+	.count          (ref_count),
+	.window         (ref_window),
+	.good           (ref_good)
+);
+
+ADF4001_refctl i_adf4001_refctl (
+	.clk            (i_clk),
+	.force_ext      (gpio_o[32]),
+	.force_int      (gpio_o[34]),
+	.det_present    (ref_present),
+	.det_window     (ref_window),
+	.det_good       (ref_good),
+	.muxout         (pll_muxout),
+	.cfg_applied    (cfg_done_sync[1] & (pll_mux_is == ref_mux_req)),
+	.cp_en          (ref_cp_req),
+	.mux_sel        (ref_mux_req),
+	.det_enable     (ref_det_enable),
+	.present        (ref_present_out),
+	.locked         (ref_locked),
+	.state          (ref_state)
 );
 
 endmodule

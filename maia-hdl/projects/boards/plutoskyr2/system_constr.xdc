@@ -137,6 +137,8 @@ set_property  -dict {PACKAGE_PIN  B15   IOSTANDARD LVCMOS25} [get_ports MDIO_PHY
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ADF4001 PLL — Bank 33 (VCCO = VCC1V8)
+# Modified by Christos Nikolaou (SV1EIA) 2026.
+# Christos Nikolaou can be reached by email at : sv1eia@gmail.com
 # ═══════════════════════════════════════════════════════════════════════════════
 set_property -dict {PACKAGE_PIN AB22 IOSTANDARD LVCMOS33} [get_ports pll_le]
 set_property -dict {PACKAGE_PIN AB21 IOSTANDARD LVCMOS33} [get_ports pll_clk]
@@ -196,6 +198,9 @@ create_clock -name clk_40m       -period 25   [get_ports i_clk]
 create_clock -name pll_muxout    -period 50   [get_ports pll_muxout]
 set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -of_objects [get_ports pll_muxout]]
 set_clock_groups -asynchronous -group [get_clocks clk_40m] -group [get_clocks pll_muxout]
+# While MUXOUT is programmed as lock detect it is a level, sampled by the
+# two-flop synchroniser in ADF4001_refctl: no timing relation to clk_40m.
+set_false_path -from [get_ports pll_muxout] -to [get_cells -hier -filter {NAME =~ *i_adf4001_refctl/mux_s_reg*}]
 
 # RGMII recovered clock from RTL8211F (125 MHz at 1 Gbps)
 # B19 = IO_L13N_T2_MRCC_35 — MRCC-capable, dedicated route valid
