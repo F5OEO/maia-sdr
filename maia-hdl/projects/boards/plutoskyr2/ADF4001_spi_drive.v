@@ -1,3 +1,6 @@
+// Modified by Christos Nikolaou (SV1EIA) 2026.
+// Christos Nikolaou can be reached by email at : sv1eia@gmail.com
+// (power-up values added: rst_n is tied high on this board)
 module ADF4001_spi_drive(
 //系统时钟与复位
     input 				clk,
@@ -6,18 +9,18 @@ module ADF4001_spi_drive(
 //状态指示
     input 				wr_en,          //写使能，高电平有效
     input 		[23:0]  wr_data,        //写数据
-    output 	reg 		wr_done,        //写完成信号，高电平有效
-    output 	reg 		wr_start,       //输出写开始信号
+    output 	reg 		wr_done  = 1'b0,    //写完成信号，高电平有效
+    output 	reg 		wr_start = 1'b0,    //输出写开始信号
 	
 //SPI 接口
-    output	reg 		spi_clk,
-    output	reg		    spi_csn,
+    output	reg 		spi_clk = 1'b0,
+    output	reg		    spi_csn = 1'b1,
     output	 			spi_sdo
 );
 
-reg	   [4:0]   bit_cnt;	            //当前输出的bit数
-reg	   [23:0]  command;
-reg	   [2:0]   state;
+reg	   [4:0]   bit_cnt = 5'd0;	    //当前输出的bit数
+reg	   [23:0]  command = 24'd0;
+reg	   [2:0]   state   = 3'd0;
 //SPI state    
 localparam     IDLE			= 0,            //空闲模式
 			   START		= 1,            //开始发送，初始化命令寄存器
