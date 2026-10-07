@@ -49,7 +49,7 @@ switch -glob -- $project_name {
      
     "fishball7020" {
         set lvds "lvds"
-        set uartlite "uartlite"
+        set uart16550 "uart16550"
         set dac_dds "dac_dds"
         set dvb "dvb"
         set vctcxo "vctcxo"
@@ -104,6 +104,7 @@ if {[info exists vctcxo]} { source $::tezuka_hdl_dir/boards/$project_name/vcxo_c
 source $::tezuka_hdl_dir/common/sweeper.tcl
 source $::tezuka_hdl_dir/common/cs12_cs8.tcl
 if {[info exists uartlite]} { source $::tezuka_hdl_dir/common/uartlite.tcl }
+if {[info exists uart16550]} { source $::tezuka_hdl_dir/common/uart16550.tcl }
 if {[info exists txfir]} { source $::tezuka_hdl_dir/common/txfir.tcl }
 if {[info exists sync]} { source $::tezuka_hdl_dir/common/sync.tcl }
 if {[info exists iqburst]} { source $::tezuka_hdl_dir/common/iqburst.tcl }
