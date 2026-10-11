@@ -1,0 +1,117 @@
+{
+ "label": "pluto-v0.3.23-release",
+ "time": "2026-10-11 07:29:15",
+ "board": [
+  "pluto",
+  "#1 SMP PREEMPT Mon Oct  5 12:04:38 UTC 2026"
+ ],
+ "F4_waterfall_profile": {
+  "frames": 48,
+  "frame_period_s": 0.1364,
+  "profiles_seen": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "first_32": [
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "step_histogram": {
+   "1": 47
+  }
+ },
+ "F4_pads_outputs_low": [
+  "bank2 DIRM=0x00003e00 OEN=0x00003e00  EN_AGC(bit12) dir=out oe=1",
+  "samples=6373864 duration=10.0s",
+  "EN_AGC: rising_edges=9 high_fraction=0.0964 first_rise=0.481s last_rise=9.215s",
+  "CTRL_IN1..3 pad: transitions=73 bits_seen=0x7 histogram: 0:0.096 1:0.124 2:0.134 3:0.131 4:0.132 5:0.136 6:0.127 7:0.119"
+ ],
+ "F4_pads_restored": "bank2 DIRM=0x00002000 OEN=0x00003e00  EN_AGC(bit12) dir=in oe=1",
+ "F1": {
+  "routing_off_api": {
+   "http": "200",
+   "reg_0x790200BC": "0x00000000"
+  },
+  "cs16_routing_off": {
+   "rc": 0,
+   "bytes": 6144000,
+   "seconds": 0.23,
+   "stderr": "",
+   "msps": 6.678,
+   "nonzero": 0.74
+  },
+  "cs12_routing_off": {
+   "rc": 0,
+   "bytes": 3932160,
+   "seconds": 0.12,
+   "stderr": "",
+   "magic_count": 5,
+   "magic_gaps": [
+    738352,
+    786432
+   ],
+   "nonzero": 0.924
+  },
+  "routing_on_api": {
+   "http": "200",
+   "reg_0x790200BC": "0x00000001"
+  },
+  "cs16_routing_on": {
+   "rc": 0,
+   "bytes": 6144000,
+   "seconds": 1.12,
+   "stderr": "",
+   "msps": 1.371,
+   "nonzero": 0.702
+  },
+  "cs12_routing_on": {
+   "rc": 0,
+   "bytes": 0,
+   "seconds": 1.12,
+   "stderr": "Unable to refill buffer: Connection timed out (110)",
+   "magic_count": 0,
+   "magic_gaps": [],
+   "nonzero": 0.0
+  },
+  "restore": {
+   "http": "200",
+   "reg_0x790200BC": "0x00000000"
+  }
+ }
+}

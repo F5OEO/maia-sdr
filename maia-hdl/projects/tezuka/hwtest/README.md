@@ -44,11 +44,29 @@ Both images are tezuka_fw v0.3.23 (2dde77d) built locally; they differ only in t
 
 Raw data: `results/v0.3.23-baseline.json`, `results/v0.3.23-fixed-bf83f60.json`.
 
+## Results (original Pluto, 2026-10-11)
+
+Baseline is the official tezuka_fw v0.3.23 release (CI build of 2dde77d) in QSPI. The fixed image is
+v0.3.23 built locally with only the Pluto `tezuka.xsa` replaced, flashed as `pluto.frm` over USB mass storage.
+
+| Check | v0.3.23 release | this branch (bf83f60) |
+|---|---|---|
+| CS12, routing on | **0 bytes**, `Unable to refill buffer: Connection timed out (110)` | 3932160 bytes, 5 sync bursts, gaps 786432; 10/10 repeats regular |
+| CS16, routing off / on | OK / OK | OK / OK |
+| EN_AGC pad (GPIO 66 forced output-low), 10 s | **9 rising edges, high 9.6 %** | 0 rising edges, high 0 % |
+| CTRL_IN1..3 pads | all 8 values | all 8 values |
+| `/waterfall` profile steps | 0..7, 47 steps of +1 | 0..7, 47 steps of +1 |
+
+The irregular full-rate CS12 gaps with routing off (see note below) also show up on the official
+release (one gap of 738352 bytes), so they come from the capture path, not from this change.
+
+Raw data: `results/pluto-v0.3.23-release.json`, `results/pluto-v0.3.23-fixed-bf83f60*.json`.
+
 Note on CS12 with routing off: at the full 30.72 MS/s the on-board `iio_readdev` capture runs at about
 39 MB/s, below the ≈92 MB/s the stream needs, and some captures lose data (irregular sync gaps:
 5/10 at 30.72 MS/s, 0/10 at 5 MS/s, 0/10 at the 1.536 MS/s DDC rate;
 `results/v0.3.23-fixed-bf83f60-cs12-{rate,repeat}.json`). This path is unchanged by the fix
-(`zero_count` was 0 there before and after); the repeat test was only run on the fixed image.
+(`zero_count` was 0 there before and after), and the original Pluto shows the same effect on the official release.
 
 The single repeated profile value on the shipped bitstream is consistent with the unsynchronised
 `profile_o` crossing, but one occurrence is not proof.

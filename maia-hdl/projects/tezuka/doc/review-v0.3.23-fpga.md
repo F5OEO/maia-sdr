@@ -4,7 +4,7 @@ Static review of the FPGA side of the Pluto and Pluto+ bitstreams shipped in tez
 (2dde77d, "Update bistreams with maia 22d590ce…"). For Pluto/Pluto+ the design source is identical
 at `refactor` 22d590c, f7092ba and 9c1cd64, with ADI hdl cf81ab15 and maia-hdl IP `maia_iio_lite`
 0.6.1. Every finding below was checked against the source and against the `system.hwh` inside the
-shipped `.xsa`. F1 and F4 were also tested on a Pluto+ (see `../hwtest/README.md`).
+shipped `.xsa`. F1 and F4 were also tested on a Pluto+ and an original Pluto (see `../hwtest/README.md`).
 
 The upstream ADI interface (axi_ad9361 CMOS 2R2T, util_wfifo/rfifo, util_cpack2/upack2, axi_dmac) and
 the maia-hdl DSP cores are used as intended. The device trees match the address map in the `.hwh`.
