@@ -53,7 +53,17 @@ def nonzero_fraction(data):
     return round(sum(1 for b in data[:200000] if b) / max(1, min(len(data), 200000)), 3)
 
 
-res = {'label': LABEL, 'time': time.strftime('%Y-%m-%d %H:%M:%S')}
+FS = os.environ.get('FS')                # optional AD9363 sample rate for the whole run, e.g. 61440000
+PHY = sh('for d in /sys/bus/iio/devices/iio:device*; do [ "$(cat $d/name)" = ad9361-phy ] && echo $d; done')[1].decode().strip()
+FS_ATTR = f'{PHY}/in_voltage_sampling_frequency'
+FS_ORIG = sh(f'cat {FS_ATTR}')[1].decode().strip()
+if FS:
+    sh(f'echo {FS} > {FS_ATTR}'); time.sleep(2)
+res = {'label': LABEL, 'time': time.strftime('%Y-%m-%d %H:%M:%S'),
+       'sampling_frequency': sh(f'cat {FS_ATTR}')[1].decode().strip(),
+       'ddc_config': json.loads(subprocess.run(['curl', '-s', f'http://{HOST}/api/ddc/config'],
+                                               capture_output=True, text=True).stdout or '{}')}
+res['ddc_config'].pop('fir1', None); res['ddc_config'].pop('fir2', None); res['ddc_config'].pop('fir3', None)
 res['board'] = sh('hostname; uname -v; md5sum /boot/system_top.bin /boot/devicetree.dtb /boot/uramdisk.image.xz; '
                   'cat /etc/fw_version 2>/dev/null')[1].decode().strip().splitlines()
 
@@ -81,6 +91,9 @@ for routing in (False, True):
     meta.update(magic_stats(data)); meta['nonzero'] = nonzero_fraction(data)
     f1[f'cs12_routing_{"on" if routing else "off"}'] = meta
 f1['restore'] = api_routing(False)
+if FS:
+    sh(f'echo {FS_ORIG} > {FS_ATTR}')
+    f1['restore_fs'] = sh(f'cat {FS_ATTR}')[1].decode().strip()
 res['F1'] = f1
 
 os.makedirs(f'{HERE}/results', exist_ok=True)

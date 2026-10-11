@@ -6,7 +6,7 @@ It talks to a running tezuka_fw image over SSH (root/analog) and HTTP.
 
 | File | Runs on | Purpose |
 |---|---|---|
-| `hwtest.py <label> [host]` | host | Runs all checks, writes `results/<label>.json` |
+| `hwtest.py <label> [host]` | host | Runs all checks, writes `results/<label>.json`; `FS=61440000` sets the AD9363 rate for the run |
 | `wfprofile.py <host> [n]` | host | Reads `/waterfall` frames; `f[0]` is the fastlock profile |
 | `agcmon.c` | board | Samples Zynq GPIO bank 2 `DATA_RO` (EMIO pad readback) for N seconds |
 
@@ -57,16 +57,26 @@ v0.3.23 built locally with only the Pluto `tezuka.xsa` replaced, flashed as `plu
 | CTRL_IN1..3 pads | all 8 values | all 8 values |
 | `/waterfall` profile steps | 0..7, 47 steps of +1 | 0..7, 47 steps of +1 |
 
-The irregular full-rate CS12 gaps with routing off (see note below) also show up on the official
+The irregular wideband CS12 gaps with routing off (see the note below) also show up on the official
 release (one gap of 738352 bytes), so they come from the capture path, not from this change.
 
 Raw data: `results/pluto-v0.3.23-release.json`, `results/pluto-v0.3.23-fixed-bf83f60*.json`.
 
-Note on CS12 with routing off: at the full 30.72 MS/s the on-board `iio_readdev` capture runs at about
-39 MB/s, below the ≈92 MB/s the stream needs, and some captures lose data (irregular sync gaps:
-5/10 at 30.72 MS/s, 0/10 at 5 MS/s, 0/10 at the 1.536 MS/s DDC rate;
-`results/v0.3.23-fixed-bf83f60-cs12-{rate,repeat}.json`). This path is unchanged by the fix
-(`zero_count` was 0 there before and after), and the original Pluto shows the same effect on the official release.
+## 61.44 MS/s (both boards, fixed bitstream)
+
+The tables above use the default 30.72 MS/s. The same test at the AD9363 maximum of 61.44 MS/s
+(`FS=61440000`, DDC output 3.072 MS/s) passes on both boards: CS12 with routing on gives
+regular sync bursts, EN_AGC shows 0 edges, CTRL_IN1..3 show all 8 profiles, and the `/waterfall`
+profile steps by +1. Raw data: `results/{plutoplus,pluto}-fixed-bf83f60-61M44.json`.
+
+## Note on CS12 with routing off
+
+On-board `iio_readdev` writing to tmpfs sustains about 39 MB/s. CS12 needs 3 bytes per complex sample,
+so about 92 MB/s at 30.72 MS/s and about 184 MB/s at 61.44 MS/s. Wideband CS12 captures in this test
+therefore lose data (irregular sync gaps: 5/10 at 30.72 MS/s, most captures at 61.44 MS/s, 0/10 at
+5 MS/s and at the DDC rate; `results/v0.3.23-fixed-bf83f60-cs12-{rate,repeat}.json`). The official
+release on the original Pluto shows the same, and this path is not touched by the change (`zero_count`
+was 0 there before and after). It is a limit of the capture tool, not an FPGA defect.
 
 The single repeated profile value on the shipped bitstream is consistent with the unsynchronised
 `profile_o` crossing, but one occurrence is not proof.
