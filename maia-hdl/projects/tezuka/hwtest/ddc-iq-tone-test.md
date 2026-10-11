@@ -35,7 +35,8 @@ classified correctly, with no other events.
 
 All images are tezuka_fw v0.3.23 (2dde77d) built locally, with only `tezuka.xsa` replaced.
 "bf83f60" is the build with the F1/F4 fix (#14), whose DDC crossing is unchanged from the shipped
-design; "this branch" is ac9b3c7 (the DDC crossing fix only). DDC decimation 20.
+design; "this branch" is ac9b3c7 (the DDC crossing fix only); "this branch + #14" is both merged
+(da26cdf). DDC decimation 20.
 
 | Board | Bitstream | ADC rate | DDC samples | Q one sample late | Other events | Tone |
 |---|---|---|---|---|---|---|
@@ -46,6 +47,10 @@ design; "this branch" is ac9b3c7 (the DDC crossing fix only). DDC decimation 20.
 | Pluto+ | this branch | 61.44 MS/s | 92.16 M | 0 | 0 | +99.97 kHz |
 | Pluto | this branch | 30.72 MS/s | 46.08 M | 0 | 0 | +99.99 kHz |
 | Pluto | this branch | 61.44 MS/s | 92.16 M | 0 | 0 | +99.98 kHz |
+| Pluto+ | this branch + #14 | 30.72 MS/s | 46.08 M | 0 | 0 | +99.99 kHz |
+| Pluto+ | this branch + #14 | 61.44 MS/s | 92.16 M | 0 | 0 | +99.98 kHz |
+| Pluto | this branch + #14 | 30.72 MS/s | 46.08 M | 0 | 0 | +99.99 kHz |
+| Pluto | this branch + #14 | 61.44 MS/s | 92.16 M | 0 | 0 | +99.98 kHz |
 
 All misalignments on the old crossing are `q_lag`: Q stale by exactly one sample, I correct. There
 were no `q_lead`, `i_*` or dropout events. They only appear at 61.44 MS/s, where the ADC-side clock
