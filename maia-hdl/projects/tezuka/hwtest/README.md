@@ -10,6 +10,7 @@ It talks to a running tezuka_fw image over SSH (root/analog) and HTTP.
 | `wfprofile.py <host> [n]` | host | Reads `/waterfall` frames; `f[0]` is the fastlock profile |
 | `agcmon.c` | board | Samples Zynq GPIO bank 2 `DATA_RO` (EMIO pad readback) for N seconds |
 | `gapcheck.c` | board | Reads a CS12 stream on stdin, reports sync gaps and lost frames from the sync counter |
+| `iiocap.c` | board | Zero-copy CS12 check with libiio: uses the mmap'd DMA blocks in place, counts lost frames |
 
 Build `agcmon` with the Buildroot cross-compiler of the image under test:
 
@@ -103,9 +104,31 @@ Pluto+, 160 MB per run (combined bitstream da26cdf, routing off):
 | 61.44 MS/s | 4 MB | 442 | 242 |
 
 So at 30.72 MS/s a CS12 capture through a pipe is marginal even with 4 MB blocks (half the runs
-lossless). At 61.44 MS/s the 2-core Zynq cannot move 184 MB/s through `iio_readdev` and a pipe. The sync counter reports every loss,
-which is what it is for. Writing to `/dev/null`, `iio_readdev` reaches about 87 MB/s and 158 MB/s
-(including start-up), so most of the loss comes from whatever consumes the stream.
+lossless), and at 61.44 MS/s a pipe cannot carry 184 MB/s. The loss is in the copy into the pipe and
+in what consumes it, not in the FPGA or the DMA.
+
+`iiocap` shows this directly. It uses the libiio local backend, whose DMA blocks are memory-mapped,
+and checks them in place, with no copy and no output. Build it with the image's cross-compiler against
+its libiio (`-I.../staging/usr/include -L.../staging/usr/lib -liio`). The `predict` mode reads only the 24
+bytes where the next sync must be, and scans a block fully only when the sync is not there:
+
+    iiocap 4194304 8 800 predict      # block bytes, kernel blocks, MB, mode
+
+Pluto+, combined bitstream, routing off:
+
+| ADC rate | Mode | Blocks | Throughput | Frames | Lost |
+|---|---|---|---|---|---|
+| 30.72 MS/s | full scan in place | 8 × 4 MB | 91 MB/s | 5 × 511 | **0** |
+| 30.72 MS/s | predict | 8 × 4 MB, 16 × 1 MB | 92.2 MB/s | 511, 508 | **0** |
+| 61.44 MS/s | predict | 8 × 4 MB (3 runs), 32 × 1 MB | 184.3 MB/s | 4 × ~1018 | **0** |
+| 61.44 MS/s | full scan in place | 8 × 4 MB | 123 MB/s | 726 | 210 |
+| 61.44 MS/s | predict, 2 × 256 KB blocks | (forced loss) | | 691-967 | 283-620 |
+
+- **Full rate is lossless:** the DMA path delivers full-rate CS12 (184 MB/s at 61.44 MS/s) without
+  loss, and the sync counter confirms every frame.
+- **Reading every byte at 61.44 is too slow:** the CPU reaches about 120-160 MB/s, so a consumer
+  that touches all the data at full rate needs to do less per byte.
+- **The check works:** with deliberately tiny buffers the same check reports the loss.
 
 The single repeated profile value on the shipped bitstream is consistent with the unsynchronised
 `profile_o` crossing, but one occurrence is not proof.
