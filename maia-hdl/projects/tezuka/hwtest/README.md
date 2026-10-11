@@ -9,6 +9,7 @@ It talks to a running tezuka_fw image over SSH (root/analog) and HTTP.
 | `hwtest.py <label> [host]` | host | Runs all checks, writes `results/<label>.json`; `FS=61440000` sets the AD9363 rate for the run |
 | `wfprofile.py <host> [n]` | host | Reads `/waterfall` frames; `f[0]` is the fastlock profile |
 | `agcmon.c` | board | Samples Zynq GPIO bank 2 `DATA_RO` (EMIO pad readback) for N seconds |
+| `gapcheck.c` | board | Reads a CS12 stream on stdin, reports sync gaps and lost frames from the sync counter |
 
 Build `agcmon` with the Buildroot cross-compiler of the image under test:
 
@@ -69,14 +70,42 @@ The tables above use the default 30.72 MS/s. The same test at the AD9363 maximum
 regular sync bursts, EN_AGC shows 0 edges, CTRL_IN1..3 show all 8 profiles, and the `/waterfall`
 profile steps by +1. Raw data: `results/{plutoplus,pluto}-fixed-bf83f60-61M44.json`.
 
+## Combined with #15 (DDC I/Q crossing), both boards
+
+Same v0.3.23 images with the bitstream of this branch merged with #15 (combined da26cdf). On the Pluto+
+(SD) and the Pluto (QSPI), at 30.72 and 61.44 MS/s:
+- CS12 with routing on gives 5 sync bursts, gaps 786432.
+- CS16 works with routing off and on.
+- EN_AGC shows 0 edges, and CTRL_IN1..3 show all 8 profiles.
+- The `/waterfall` profile steps 0..7 by +1.
+
+Raw data: `results/{plutoplus,pluto}-combined-da26cdf-{30M72,61M44}.json`.
+
 ## Note on CS12 with routing off
 
-On-board `iio_readdev` writing to tmpfs sustains about 39 MB/s. CS12 needs 3 bytes per complex sample,
-so about 92 MB/s at 30.72 MS/s and about 184 MB/s at 61.44 MS/s. Wideband CS12 captures in this test
-therefore lose data (irregular sync gaps: 5/10 at 30.72 MS/s, most captures at 61.44 MS/s, 0/10 at
-5 MS/s and at the DDC rate; `results/v0.3.23-fixed-bf83f60-cs12-{rate,repeat}.json`). The official
-release on the original Pluto shows the same, and this path is not touched by the change (`zero_count`
-was 0 there before and after). It is a limit of the capture tool, not an FPGA defect.
+Wideband CS12 needs 3 bytes per complex sample: about 92 MB/s at 30.72 MS/s and 184 MB/s at 61.44 MS/s.
+`hwtest.py` captures with 64 KB DMA blocks into tmpfs, which cannot keep up, so its wideband CS12
+captures with routing off show irregular sync gaps. The official release shows the same. This path is
+not touched by this change (`zero_count` was 0 there before and after).
+
+`gapcheck` reads the 32-bit sync counter after each magic (bytes 20-23, +1 per sync), so it counts lost
+frames exactly. Build it like `agcmon`, then run on the board:
+
+    iio_readdev -b 4194304 -s 80000000 cf-ad9361-lpc voltage1 | ./gapcheck
+
+Pluto+, 160 MB per run (combined bitstream da26cdf, routing off):
+
+| ADC rate | DMA block | Frames produced | Frames lost |
+|---|---|---|---|
+| 30.72 MS/s | 1 MB | 248 | 42 |
+| 30.72 MS/s | 4 MB | 202-220 | 0 in 3 of 6 runs; otherwise 3, 17 frames or a partial frame |
+| 61.44 MS/s | 1 MB | 313 | 112 |
+| 61.44 MS/s | 4 MB | 442 | 242 |
+
+So at 30.72 MS/s a CS12 capture through a pipe is marginal even with 4 MB blocks (half the runs
+lossless). At 61.44 MS/s the 2-core Zynq cannot move 184 MB/s through `iio_readdev` and a pipe. The sync counter reports every loss,
+which is what it is for. Writing to `/dev/null`, `iio_readdev` reaches about 87 MB/s and 158 MB/s
+(including start-up), so most of the loss comes from whatever consumes the stream.
 
 The single repeated profile value on the shipped bitstream is consistent with the unsynchronised
 `profile_o` crossing, but one occurrence is not proof.
