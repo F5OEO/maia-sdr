@@ -1,0 +1,54 @@
+# Pluto/Pluto+ hardware test: CS12 vs DDC routing, fastlock sweeper
+
+Host-driven test for the CS12 `zero_count` / DDC-routing GPIO conflict and for
+`sweeper_it` (see `../doc/review-v0.3.23-fpga.md`, findings F1 and F4).
+It talks to a running tezuka_fw image over SSH (root/analog) and HTTP.
+
+| File | Runs on | Purpose |
+|---|---|---|
+| `hwtest.py <label> [host]` | host | Runs all checks, writes `results/<label>.json` |
+| `wfprofile.py <host> [n]` | host | Reads `/waterfall` frames; `f[0]` is the fastlock profile |
+| `agcmon.c` | board | Samples Zynq GPIO bank 2 `DATA_RO` (EMIO pad readback) for N seconds |
+
+Build `agcmon` with the Buildroot cross-compiler of the image under test:
+
+    output/plutoplus/host/bin/arm-linux-gcc -O2 -Wall -o agcmon agcmon.c
+
+Host requirements: `sshpass`, `curl`, Python with `websockets`.
+
+## What it checks
+
+1. **Sweeper cadence**: 48 `/waterfall` frames; the profile in `f[0]` must step by 1 per frame through 0..7.
+2. **Sweeper pins**: GPIO 63-66 (CTRL_IN1..3, EN_AGC) are made PS outputs driven low, as the tezuka sweep
+   mode does for 63-65, and the pads are sampled for 10 s. CTRL_IN1..3 must show all 8 profiles; EN_AGC
+   must stay low. The lines are returned to inputs afterwards (`gpioget`).
+3. **CS12 with DDC routing**: routing is switched with maia-httpd `PATCH /api/ddc/config {"enabled":…}`
+   (axi_ad9361 `up_adc_gpio_out` bit 0). For routing off and on it captures CS16 (`voltage0 voltage1`)
+   and CS12 (`voltage1` only) with `iio_readdev` on the board, and checks the CS12 sync bursts
+   (20-byte magic every 786432 bytes through util_cpack2). Routing is disabled again at the end.
+
+## Results (Pluto+, 2026-10-11)
+
+Both images are tezuka_fw v0.3.23 (2dde77d) built locally; they differ only in the Pluto+ `tezuka.xsa`
+(same kernel, same `devicetree.dtb` md5 `ba5c7f5c…`).
+
+| Check | v0.3.23 shipped bitstream | this branch (bf83f60) |
+|---|---|---|
+| `/boot/system_top.bin` md5 | `618a5b4a…` | `2e21d04b…` |
+| CS12, routing on | **0 bytes**, `Unable to refill buffer: Connection timed out (110)` | 3932160 bytes, 5 sync bursts, all gaps 786432; 10/10 repeats regular |
+| CS12, routing off | 3932160 bytes, gaps 786432 | 3932160 bytes, see note below |
+| CS16, routing off / on | OK / OK (≈1.3-1.4 MS/s measured incl. start-up, DDC 1.536 MS/s) | OK / OK |
+| EN_AGC pad (GPIO 66 forced output-low), 10 s | **25 rising edges, high 12.3 %** (1 frame in 8) | 0 rising edges, high 0 % |
+| CTRL_IN1..3 pads | all 8 values, ≈12.5 % each | all 8 values, ≈12.5 % each |
+| `/waterfall` profile steps | 0..7, 46 steps of +1, one repeated value | 0..7, 47 steps of +1 |
+
+Raw data: `results/v0.3.23-baseline.json`, `results/v0.3.23-fixed-bf83f60.json`.
+
+Note on CS12 with routing off: at the full 30.72 MS/s the on-board `iio_readdev` capture runs at about
+39 MB/s, below the ≈92 MB/s the stream needs, and some captures lose data (irregular sync gaps:
+5/10 at 30.72 MS/s, 0/10 at 5 MS/s, 0/10 at the 1.536 MS/s DDC rate;
+`results/v0.3.23-fixed-bf83f60-cs12-{rate,repeat}.json`). This path is unchanged by the fix
+(`zero_count` was 0 there before and after); the repeat test was only run on the fixed image.
+
+The single repeated profile value on the shipped bitstream is consistent with the unsynchronised
+`profile_o` crossing, but one occurrence is not proof.
