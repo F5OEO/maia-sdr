@@ -17,10 +17,11 @@ ad_disconnect mux_decim_q/enable_out util_ad9361_adc_pack/enable_1
 ad_disconnect util_ad9361_adc_fifo/dout_enable_2 util_ad9361_adc_pack/enable_2
 ad_disconnect util_ad9361_adc_fifo/dout_enable_3 util_ad9361_adc_pack/enable_3
 
-# Generate synchronous reset for zero_count from ADC GPIO 0
+# Generate synchronous reset for zero_count from ADC GPIO 3
+# (bit 0 is the DDC routing select in maiafirtoiq.tcl, bits 1-2 are used by sync.tcl)
 ad_ip_instance xlslice cs12_zero_count_slice
-ad_ip_parameter cs12_zero_count_slice CONFIG.DIN_FROM 0
-ad_ip_parameter cs12_zero_count_slice CONFIG.DIN_TO 0
+ad_ip_parameter cs12_zero_count_slice CONFIG.DIN_FROM 3
+ad_ip_parameter cs12_zero_count_slice CONFIG.DIN_TO 3
 ad_connect axi_ad9361/up_adc_gpio_out cs12_zero_count_slice/Din
 
 ### CHANNEL 0 ###
