@@ -1,0 +1,146 @@
+{
+ "fs": 30720000,
+ "cases": [
+  {
+   "tone_index": 0,
+   "tone_hz": 960000,
+   "routing_off": {
+    "rx1": {
+     "peak_hz": 960000.0,
+     "peak_dbfs": -6.0,
+     "next_dbfs": -71.0,
+     "rms_lsb": 1024.0
+    },
+    "rx2": {
+     "peak_hz": 960000.0,
+     "peak_dbfs": -6.0,
+     "next_dbfs": -71.0,
+     "rms_lsb": 1024.0
+    }
+   },
+   "ddc_rate": 1536000.0,
+   "rx2_expected_alias_hz": -576000.0,
+   "routing_on": {
+    "rx1": {
+     "peak_hz": 100007.8,
+     "peak_dbfs": -14.4,
+     "next_dbfs": -69.7,
+     "rms_lsb": 413.6
+    },
+    "rx2": {
+     "peak_hz": -768000.0,
+     "peak_dbfs": -240.0,
+     "next_dbfs": -240.0,
+     "rms_lsb": 0.0
+    },
+    "rx2_all_zero": true
+   }
+  },
+  {
+   "tone_index": 1,
+   "tone_hz": 1920000,
+   "routing_off": {
+    "rx1": {
+     "peak_hz": 1920000.0,
+     "peak_dbfs": -6.0,
+     "next_dbfs": -73.3,
+     "rms_lsb": 1023.9
+    },
+    "rx2": {
+     "peak_hz": 1920000.0,
+     "peak_dbfs": -6.0,
+     "next_dbfs": -73.3,
+     "rms_lsb": 1023.9
+    }
+   },
+   "ddc_rate": 1536000.0,
+   "rx2_expected_alias_hz": 384000.0,
+   "routing_on": {
+    "rx1": {
+     "peak_hz": 100007.8,
+     "peak_dbfs": -14.4,
+     "next_dbfs": -69.7,
+     "rms_lsb": 413.6
+    },
+    "rx2": {
+     "peak_hz": -768000.0,
+     "peak_dbfs": -240.0,
+     "next_dbfs": -240.0,
+     "rms_lsb": 0.0
+    },
+    "rx2_all_zero": true
+   }
+  },
+  {
+   "tone_index": 2,
+   "tone_hz": 2880000,
+   "routing_off": {
+    "rx1": {
+     "peak_hz": 2880000.0,
+     "peak_dbfs": -6.0,
+     "next_dbfs": -71.0,
+     "rms_lsb": 1024.0
+    },
+    "rx2": {
+     "peak_hz": 2880000.0,
+     "peak_dbfs": -6.0,
+     "next_dbfs": -71.0,
+     "rms_lsb": 1024.0
+    }
+   },
+   "ddc_rate": 1536000.0,
+   "rx2_expected_alias_hz": -192000.0,
+   "routing_on": {
+    "rx1": {
+     "peak_hz": 100007.8,
+     "peak_dbfs": -14.4,
+     "next_dbfs": -69.8,
+     "rms_lsb": 413.6
+    },
+    "rx2": {
+     "peak_hz": -768000.0,
+     "peak_dbfs": -240.0,
+     "next_dbfs": -240.0,
+     "rms_lsb": 0.0
+    },
+    "rx2_all_zero": true
+   }
+  },
+  {
+   "tone_index": 3,
+   "tone_hz": 3840000,
+   "routing_off": {
+    "rx1": {
+     "peak_hz": 3840000.0,
+     "peak_dbfs": -6.0,
+     "next_dbfs": -71.4,
+     "rms_lsb": 1024.0
+    },
+    "rx2": {
+     "peak_hz": 3840000.0,
+     "peak_dbfs": -6.0,
+     "next_dbfs": -71.4,
+     "rms_lsb": 1024.0
+    }
+   },
+   "ddc_rate": 1536000.0,
+   "rx2_expected_alias_hz": -768000.0,
+   "routing_on": {
+    "rx1": {
+     "peak_hz": 100007.8,
+     "peak_dbfs": -14.4,
+     "next_dbfs": -69.7,
+     "rms_lsb": 413.6
+    },
+    "rx2": {
+     "peak_hz": -768000.0,
+     "peak_dbfs": -240.0,
+     "next_dbfs": -240.0,
+     "rms_lsb": 0.0
+    },
+    "rx2_all_zero": true
+   }
+  }
+ ],
+ "note": "bitstream: tezuka refactor + #14 + #15 + this change, Pluto+ in 2r2t mode"
+}
