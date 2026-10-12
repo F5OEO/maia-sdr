@@ -21,6 +21,7 @@ from .ddc import DDC
 from .pulse import PulseStretcher
 from .pluto_platform import PlutoPlatform
 from .register import Access, Field, Registers, Register, RegisterMap
+from .round_saturate import RoundSaturate
 from .recorder import Recorder16IQ, RecorderMode
 from .spectrometer import Spectrometer
 from .topfft import TopFFT
@@ -355,11 +356,22 @@ class MaiaSDR(Elaboratable):
                 spectrometer_im_in.eq(rxiq_cdc.im_out << shift),
                 spectrometer_strobe_in.eq(rxiq_cdc.strobe_out),
             ]
+        # The DDC output to IIO is 12 bits (the IIO channels are S12/16).
+        # Round to nearest instead of truncating, which would add a DC bias
+        # of -0.5 LSB on I and Q, and saturate at the 12-bit limits.
+        m.submodules.decim_re_round = decim_re_round = RoundSaturate(
+            len(self.ddc.re_out), 4, 12)
+        m.submodules.decim_im_round = decim_im_round = RoundSaturate(
+            len(self.ddc.im_out), 4, 12)
+        m.d.comb += [
+            decim_re_round.x.eq(self.ddc.re_out),
+            decim_im_round.x.eq(self.ddc.im_out),
+        ]
         m.d.sync += [
-                self.decim_re_out.eq(self.ddc.re_out >> 4),
-                self.decim_im_out.eq(self.ddc.im_out >> 4),
-                self.decim_strobe_out.eq(self.ddc.strobe_out),                
-            ]    
+                self.decim_re_out.eq(decim_re_round.y),
+                self.decim_im_out.eq(decim_im_round.y),
+                self.decim_strobe_out.eq(self.ddc.strobe_out),
+            ]
         m.d.comb += [
             self.spectrometer.strobe_in.eq(spectrometer_strobe_in),
             self.spectrometer.common_edge_2x.eq(common_edge_2x.common_edge),
