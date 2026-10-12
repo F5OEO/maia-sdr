@@ -98,7 +98,3 @@ set_input_jitter clk_fpga_1 0.15
 # False path constraints (generic maia-sdr infrastructure)
 set_false_path -from [get_pins {i_system_wrapper/system_i/axi_ad9361/inst/i_rx/i_up_adc_common/up_adc_gpio_out_int_reg[0]/C}]
 set_false_path -from [get_pins {i_system_wrapper/system_i/axi_ad9361/inst/i_tx/i_up_dac_common/up_dac_gpio_out_int_reg[0]/C}]
-# NOTE: nano's/pciesdr7010's third false-path (manual_decim/.../gpio_Data_Out_reg[0])
-# has no matching object in this LVDS-mode netlist ("No valid object(s) found",
-# harmless) -- the axi_ad9361 LVDS core's internal hierarchy differs from the
-# CMOS-mode core nano uses. Design met timing (WNS=+0.049ns) without it.
