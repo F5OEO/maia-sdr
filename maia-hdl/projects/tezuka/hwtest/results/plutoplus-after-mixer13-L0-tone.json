@@ -1,0 +1,221 @@
+{
+ "fs": 30720000,
+ "tone_hz": 960000,
+ "bist_level_db": 0,
+ "ddc_out": 1536000.0,
+ "routing_reg": "0x00000001",
+ "captures": [
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  },
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  },
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  },
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  },
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  },
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  },
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  },
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  },
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  },
+  {
+   "samples": 1536000,
+   "amp": 827.1,
+   "noise_lsb_i_q": [
+    0.85,
+    0.85
+   ],
+   "thr_lsb_q": 8.5,
+   "q_slip_detectable_fraction": 0.984,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99992.5,
+   "valid": true
+  }
+ ],
+ "total": {
+  "samples": 15360000,
+  "q_lag": 0,
+  "q_lead": 0,
+  "i_lag": 0,
+  "i_lead": 0,
+  "dropout": 0,
+  "other": 0
+ },
+ "invalid_captures": [],
+ "iq_misalign_per_million": 0.0,
+ "note": "bitstream: refactor + #14 + #15 + #16 + #17 + this change (13-bit DDC mixer output)"
+}

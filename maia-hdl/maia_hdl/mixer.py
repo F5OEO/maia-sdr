@@ -24,16 +24,20 @@ class Mixer(Elaboratable):
     for the complex exponential function and a ``Cmult3x`` for the
     complex multiplication.
 
-    It is assumed that the input amplitude is not greater than
-    ``2**(width-1)-1``. Otherwise the output overflows due to the
-    rotation.
+    The rotation keeps the magnitude of the input, but one component of the
+    output can be as large as the magnitude. With ``out_width == width`` the
+    output wraps if the input magnitude is greater than ``2**(width-1)-1``
+    (for instance I and Q both near full scale). ``out_width = width + 1``
+    holds any ``width``-bit input without overflow.
 
     Parameters
     ----------
     domain_3x : str
         Name of the clock domain of the 3x clock.
     width : int
-        Width of input and output.
+        Width of the input.
+    out_width : int
+        Width of the output. Defaults to ``width``.
     nco_width : int
         Width of the NCO register.
     exp_width : int
@@ -60,16 +64,22 @@ class Mixer(Elaboratable):
         Real part of the input.
     im_in : Signal(signed(width)), in
         Imaginary part of the input.
-    re_out : Signal(signed(width)), in
+    re_out : Signal(signed(out_width)), out
         Real part of the output.
-    im_out : Signal(signed(width)), in
+    im_out : Signal(signed(out_width)), out
         Imaginary part of the output.
     """
     def __init__(self, domain_3x: str, width: int, *,
+                 out_width: int = None,
                  nco_width: int = 28, exp_width: int = 18,
                  phase_bits: int = 10):
         self._3x = domain_3x
         self.w = width
+        self.out_w = width if out_width is None else out_width
+        # A rotated width-bit input needs at most width + 1 bits (its
+        # magnitude is at most sqrt(2) * 2**(width-1)), and the complex
+        # multiplier below keeps that many bits after rounding.
+        assert self.w <= self.out_w <= self.w + 1
         self.nco_width = nco_width
         self.exp_width = exp_width
         self.phase_bits = phase_bits
@@ -79,8 +89,8 @@ class Mixer(Elaboratable):
         self.frequency = Signal(signed(self.nco_width))
         self.re_in = Signal(signed(self.w))
         self.im_in = Signal(signed(self.w))
-        self.re_out = Signal(signed(self.w), reset_less=True)
-        self.im_out = Signal(signed(self.w), reset_less=True)
+        self.re_out = Signal(signed(self.out_w), reset_less=True)
+        self.im_out = Signal(signed(self.out_w), reset_less=True)
 
         # Truncate by exp_width - 2 instead of exp_width - 1
         # because the LSB will be used to round half-up
@@ -101,10 +111,10 @@ class Mixer(Elaboratable):
         round_up = 2**(trunc - 1)
         re = clamp_nbits(
             (re_in * cexp_re - im_in * cexp_im + round_up) >> trunc,
-            self.w)
+            self.out_w)
         im = clamp_nbits(
             (re_in * cexp_im + im_in * cexp_re + round_up) >> trunc,
-            self.w)
+            self.out_w)
         return re, im
 
     def cexp(self):
