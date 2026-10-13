@@ -32,7 +32,9 @@ class TestRoundSaturate(unittest.TestCase):
         async def bench(ctx):
             for v, e in zip(x, expected):
                 ctx.set(self.dut.x, int(v))
-                assert ctx.get(self.dut.y) == e, (int(v), ctx.get(self.dut.y), int(e))
+                assert ctx.get(
+                    self.dut.y) == e, (int(v), ctx.get(
+                        self.dut.y), int(e))
 
         self.simulate(bench)
 
