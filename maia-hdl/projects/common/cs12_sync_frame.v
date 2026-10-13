@@ -14,8 +14,10 @@
 //   A1 5C 1E AB D2 C5 EF 12 37 9A 4D 6B E1 F0 8A 3C 56 7D 91 24  <CTR0 CTR1 CTR2 CTR3>
 //   bytes 0..19 = MAGIC (fixed) ; bytes 20..23 = COUNTER uint32 LE, +1 per sync burst.
 // The per-cycle word values below are chosen so the LE byte interleave equals that stream.
+// The 8 replaced samples are lost (the stream has a gap). Full host contract, including the
+// burst layout and loss detection: projects/tezuka/doc/cs12-stream.md.
 module cs12_sync_frame #(
-    parameter integer SYNC_PERIOD_SAMPLES = 262144,   // multiple of 8; MUST match the host
+    parameter integer SYNC_PERIOD_SAMPLES = 262144,   // multiple of 8; hosts measure it from the MAGIC spacing
     parameter integer DATA_WIDTH          = 16
 )(
     input                       clk,

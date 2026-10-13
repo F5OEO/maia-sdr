@@ -1,0 +1,47 @@
+{
+ "fs": 2500000,
+ "tone_hz": 78125,
+ "bytes": 3932160,
+ "magic_count": 5,
+ "magic_gaps": [
+  786432
+ ],
+ "counter_steps": [
+  1
+ ],
+ "periods": [
+  {
+   "samples": 262136,
+   "amplitude": 1024.0,
+   "rel_rms_residual": 0.0007,
+   "sign": 1,
+   "phase0": 1.1780972521926312
+  },
+  {
+   "samples": 262136,
+   "amplitude": 1024.0,
+   "rel_rms_residual": 0.0007,
+   "sign": 1,
+   "phase0": 1.1780972521926312
+  },
+  {
+   "samples": 262136,
+   "amplitude": 1024.0,
+   "rel_rms_residual": 0.0007,
+   "sign": 1,
+   "phase0": 1.1780972521926312
+  },
+  {
+   "samples": 262136,
+   "amplitude": 1024.0,
+   "rel_rms_residual": 0.0007,
+   "sign": 1,
+   "phase0": 1.1780972521926312
+  }
+ ],
+ "phase_step_samples_across_sync": [
+  9.0,
+  9.0,
+  9.0
+ ]
+}
