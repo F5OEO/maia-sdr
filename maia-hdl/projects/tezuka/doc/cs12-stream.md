@@ -56,13 +56,16 @@ A1 5C 1E AB D2 C5 EF 12 37 9A 4D 6B E1 F0 8A 3C 56 7D 91 24  <counter: uint32, l
   n - 1 whole periods were lost; a MAGIC that is not one period after the previous one means bytes were lost
   inside a period, and the decoder should re-align on it.
 
-- **Reader buffer size:** the stream is 3 bytes per sample (92 MB/s at 30.72 MS/s), and a reader that copies
-  every block can drop whole periods if its buffers are small. On a Pluto+ and an original Pluto, `iio_readdev`
-  writing to `/tmp` with a 128 KiB buffer (`-b 65536`) lost periods in 12 of 32 captures of 4 periods (and
-  in most 10-period captures) at 30.72 MS/s, while a 2 MiB buffer (`-b 1048576`) lost none in 97 captures (4 and
-  10 periods). The gateware
-  does not drop data: zero-copy libiio reads of the DMA buffers showed no gaps at 61.44 MS/s. Use the counter
-  check above to detect a lossy reader.
+- **Reader buffer size:** the stream is 3 bytes per sample (92 MB/s at 30.72 MS/s, 184 MB/s at 61.44 MS/s), and
+  a reader that copies every block can drop whole periods if its buffers are small. On a Pluto+ and an original
+  Pluto at 30.72 MS/s, `iio_readdev` writing to `/tmp` with a 128 KiB buffer (`-b 65536`) lost periods in 12 of
+  32 captures of 4 periods (and in most 10-period captures), while a 2 MiB buffer (`-b 1048576`) lost none in 97
+  captures (4 and 10 periods). The gateware does not drop data: zero-copy libiio reads of the DMA buffers showed
+  no gaps at 61.44 MS/s (400 MB at 184.3 MB/s, no frame missing, reading only the expected sync positions). At
+  61.44 MS/s a 2 MiB buffer is still lossless for short captures (40 of 40 captures of 4 periods), but
+  `iio_readdev` writing 32 MB (40 periods) lost data in most runs, and a zero-copy reader that scans every byte
+  reached only about 155 MB/s. The Zynq CPU cannot copy or scan 184 MB/s for long, so use short captures or a
+  reader that does not touch every byte. Use the counter check above to detect a lossy reader.
 
 CS8 and CS16 have no sync bursts.
 
