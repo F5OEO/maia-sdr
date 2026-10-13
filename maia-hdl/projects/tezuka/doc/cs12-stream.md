@@ -64,8 +64,10 @@ A1 5C 1E AB D2 C5 EF 12 37 9A 4D 6B E1 F0 8A 3C 56 7D 91 24  <counter: uint32, l
   no gaps at 61.44 MS/s (400 MB at 184.3 MB/s, no frame missing, reading only the expected sync positions). At
   61.44 MS/s a 2 MiB buffer is still lossless for short captures (40 of 40 captures of 4 periods), but
   `iio_readdev` writing 32 MB (40 periods) lost data in most runs, and a zero-copy reader that scans every byte
-  reached only about 155 MB/s. The Zynq CPU cannot copy or scan 184 MB/s for long, so use short captures or a
-  reader that does not touch every byte. Use the counter check above to detect a lossy reader.
+  reached only about 155 MB/s. On these boards one CPU core measured about 160-230 MB/s for a memcpy, 200-230
+  MB/s for a scan and 204-244 MB/s for a write to `/tmp`, so each step alone has little or no margin over 184
+  MB/s, and copy plus scan together reached only 85-117 MB/s. Use short captures, or a reader that does not
+  touch every byte. Use the counter check above to detect a lossy reader.
 
 CS8 and CS16 have no sync bursts.
 
