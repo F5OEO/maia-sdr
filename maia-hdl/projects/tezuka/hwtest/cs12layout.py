@@ -81,9 +81,10 @@ routing = json.loads(subprocess.run(['curl',
 assert routing in (False, None), 'DDC routing must be off'
 sh(f'echo "2 {tone} 6 0" > {DBG}/bist_tone')
 period_bytes = 786432
-# iio_readdev counts 16-bit voltage1 samples
+# iio_readdev counts 16-bit voltage1 samples. Use a 2 MiB buffer: with 128 KiB
+# the reader drops whole sync periods at 30.72 MS/s (in a third of captures)
 nsamp = (PERIODS + 1) * period_bytes // 2
-raw = sh(f'iio_readdev -b 65536 -s {nsamp} cf-ad9361-lpc voltage1 '
+raw = sh(f'iio_readdev -b 1048576 -s {nsamp} cf-ad9361-lpc voltage1 '
          f'> /tmp/c12.bin 2>/dev/null; cat /tmp/c12.bin; '
          f'rm -f /tmp/c12.bin', timeout=120)
 sh(f'echo "0 0 0 0" > {DBG}/bist_tone')
@@ -102,6 +103,8 @@ res = {'fs': fs,
        'counter_steps': sorted(set(b - a for a,
                                    b in zip(ctr,
                                             ctr[1:]))),
+       'lossless': all(g == period_bytes for g in gaps) and all(
+           y == x + 1 for x, y in zip(ctr, ctr[1:])),
        'periods': []}
 
 w = 2 * np.pi * tone / fs
@@ -142,5 +145,8 @@ for p in res['periods']:
 os.makedirs(f'{HERE}/results', exist_ok=True)
 json.dump(res, open(f'{HERE}/results/{LABEL}cs12layout.json', 'w'), indent=1)
 print(json.dumps({k: v for k, v in res.items() if k != 'periods'}))
+if not res['lossless']:
+    print('WARNING: the reader lost data (sync gap != %d or counter jump); '
+          'repeat the capture' % period_bytes)
 for p in res['periods']:
     print(p)
