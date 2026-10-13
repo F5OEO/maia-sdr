@@ -25,7 +25,7 @@ class TestMixer(AmaranthSim):
         self.dut = CommonEdgeTb(
             mixer, [(domain_3x, 3, 'common_edge')])
         num_inputs = 1000
-        re, im = [np.random.randint(-2**(width-1), 2**(width-1),
+        re, im = [np.random.randint(-2**(width - 1), 2**(width - 1),
                                     size=num_inputs)
                   for _ in range(2)]
         # skip the first few output samples, because the BRAM
@@ -62,11 +62,11 @@ class TestMixer(AmaranthSim):
         self.dut = CommonEdgeTb(
             mixer, [(domain_3x, 3, 'common_edge')])
         num_inputs = 1000
-        re, im = [np.random.randint(-2**(width-1), 2**(width-1),
+        re, im = [np.random.randint(-2**(width - 1), 2**(width - 1),
                                     size=num_inputs)
                   for _ in range(2)]
-        re[::7] = -2**(width-1)
-        im[::7] = -2**(width-1)
+        re[::7] = -2**(width - 1)
+        im[::7] = -2**(width - 1)
         skip = 2
         expected_re, expected_im = mixer.model(freq, re[skip:], im[skip:])
         # exact rotation by the same lookup table phases
@@ -75,9 +75,11 @@ class TestMixer(AmaranthSim):
         n = 2**mixer.phase_bits
         exact = ((re[skip:] + 1j * im[skip:])
                  * np.exp(-1j * 2 * np.pi * phase / n))
-        err = np.abs(expected_re - exact.real) + np.abs(expected_im - exact.imag)
+        err = np.abs(expected_re - exact.real) + \
+            np.abs(expected_im - exact.imag)
         assert np.max(err) < 3, np.max(err)
-        assert np.max(np.abs(exact.real)) > 2**(width-1), 'test needs > 12-bit outputs'
+        assert np.max(np.abs(exact.real)) > 2**(width - 1), \
+            'test needs > 12-bit outputs'
         go_back = mixer.delay + skip
 
         async def bench(ctx):
