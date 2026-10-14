@@ -30,3 +30,10 @@ dut.v:
 .PHONY: -g2005
 -g2005:
 	echo "Verilog 2005 mode enabled"
+
+# The exact I/Q and magnitude comparisons only pass when run alone (see EXACT in
+# test_spectrometer.py), so each gets its own simulation.
+.PHONY: exact
+exact:
+	SPECTROMETER_EXACT=1 TESTCASE=test_iq_and_magnitude_exact $(MAKE) sim
+	SPECTROMETER_EXACT=1 TESTCASE=test_iq_and_magnitude_exact_backpressure $(MAKE) sim
