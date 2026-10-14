@@ -337,42 +337,71 @@ class Spectrometer(Elaboratable):
             # internal latency structure, to confirm it isn't an
             # artifact of this test's specific timing (nint, truncation
             # amount, etc.) rather than a general property.
+            # The integrator's write path adds this many cycles between the FFT
+            # output and the memory write (to_fp 2 + common_exp 2 + cpwr 3 +
+            # memory 2 = 7; see spectrum_integrator.py). The I/Q tap is
+            # delayed by the same amount, so its data, frame-start flag, strobe
+            # and buffer select line up with the write address exactly as in
+            # the magnitude path. This replaces the earlier empirically tuned
+            # reset constant.
+            IQ_DELAY = 7
+
+            def _delay(sig, n):
+                for _ in range(n):
+                    nxt = Signal(len(sig), reset_less=True)
+                    m.d.sync += nxt.eq(sig)
+                    sig = nxt
+                return sig
+
+            iq_re_d = _delay(fft.re_out >> trunc, IQ_DELAY)
+            iq_im_d = _delay(fft.im_out >> trunc, IQ_DELAY)
+            iq_strobe_d = _delay(self.strobe_in, IQ_DELAY)
+            iq_last_d = _delay(fft.out_last, IQ_DELAY)
+            iq_end_d = _delay(self.end_fft, IQ_DELAY)
+            iq_pingpong_d = _delay(iq_pingpong, IQ_DELAY)
+
+            # Write address counter, same role as write_counter in the
+            # integrator:
+            # counts 0..N-1 through a frame (out_last, now delayed, marks the
+            # last sample). The last sample keeps its own address (N-1); the
+            # counter then restarts at 0 for the next frame's first sample.
             iq_write_counter = Signal(self.fft_order_log2)
-            # One-cycle-delayed copy of "last sample of the epoch's last
-            # frame was just written": by the time this is high, that
-            # synchronous memory write has landed and iq_pingpong has
-            # already flipped, so it's the correct cycle to kick off the
-            # DMA read of the just-completed buffer.
+            iq_addr_plain = Signal(self.fft_order_log2)
+            m.d.comb += iq_addr_plain.eq(iq_write_counter)
+            with m.If(iq_strobe_d):
+                m.d.sync += iq_write_counter.eq(
+                    Mux(iq_last_d, 0, iq_write_counter + 1))
+
+            # Frame-start flip of the buffer selection, applied in the
+            # undelayed domain so that the delayed data of that frame lands in
+            # the new buffer.
+            with m.If(self.strobe_in & fft.out_last & self.end_fft):
+                m.d.sync += iq_pingpong.eq(~iq_pingpong)
+
+            # The buffer-complete pulse for the DMA, aligned to the delayed
+            # write.
             iq_epoch_done = Signal()
-
-            with m.If(self.strobe_in):
-                m.d.sync += iq_write_counter.eq(iq_write_counter + 1)
-                with m.If(fft.out_last):
-                    m.d.sync += iq_write_counter.eq(
-                        2**(self.fft_order_log2 - 1) + 1)
-                    with m.If(self.end_fft):
-                        m.d.sync += iq_pingpong.eq(~iq_pingpong)
-
-            m.d.sync += iq_epoch_done.eq(
-                self.strobe_in & fft.out_last & self.end_fft)
+            m.d.sync += iq_epoch_done.eq(iq_strobe_d & iq_last_d & iq_end_d)
 
             # Same bit-reverse + MSB-invert transform as write_counter_shift
             # / read_counter_shift in spectrum_integrator.py, to match the
             # bin order (bit-reversed FFT output, fftshifted) the magnitude
             # waterfall already uses.
-            iq_write_counter_rev = iq_write_counter[::-1]
-            iq_write_addr = Cat(iq_write_counter_rev[:-1],
-                                ~iq_write_counter_rev[-1])
+            iq_addr_rev = iq_addr_plain[::-1]
+            iq_write_addr = Cat(iq_addr_rev[:-1], ~iq_addr_rev[-1])
 
             # I/Q sample layout: Q (im) in the low 16 bits, I (re) in the
             # high 16 bits of the 32-bit word.
-            iq_write_data = Cat(fft.im_out >> trunc, fft.re_out >> trunc)
+            # Each half is 16 bits: the >> trunc above keeps the 22-bit
+            # width, so slice explicitly or the concatenation overflows the
+            # 32-bit word and mixes the imaginary bits into the real half.
+            iq_write_data = Cat(iq_im_d[:16], iq_re_d[:16])
 
             m.d.comb += [
                 iq_wrports[0].en.eq(
-                    ~iq_pingpong & self.strobe_in & self.end_fft),
+                    ~iq_pingpong_d & iq_strobe_d & iq_end_d),
                 iq_wrports[1].en.eq(
-                    iq_pingpong & self.strobe_in & self.end_fft),
+                    iq_pingpong_d & iq_strobe_d & iq_end_d),
             ]
             for wr in iq_wrports:
                 m.d.comb += [
