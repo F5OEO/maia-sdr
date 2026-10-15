@@ -285,10 +285,21 @@ class Spectrometer(Elaboratable):
             # integrator's CpwrPeak stage discards phase. Same domain_3x
             # assumption the integrator itself already makes for fft.re_out/
             # im_out (no explicit CDC there either).
+            # One pipeline register on the tap (data and strobe together, so
+            # they stay aligned) keeps the FFT output's fanout off the
+            # Recorder16IQ FIFO write path, which failed timing at 187.5 MHz.
+            raw_re_q = Signal(16)
+            raw_im_q = Signal(16)
+            raw_strobe_q = Signal()
+            m.d[self._domain_3x] += [
+                raw_re_q.eq(fft.re_out >> trunc),
+                raw_im_q.eq(fft.im_out >> trunc),
+                raw_strobe_q.eq(self.strobe_in),
+            ]
             m.d.comb += [
-                raw_capture.re_in.eq(fft.re_out >> trunc),
-                raw_capture.im_in.eq(fft.im_out >> trunc),
-                raw_capture.strobe_in.eq(self.strobe_in),
+                raw_capture.re_in.eq(raw_re_q),
+                raw_capture.im_in.eq(raw_im_q),
+                raw_capture.strobe_in.eq(raw_strobe_q),
                 raw_capture.mode.eq(RecorderMode.MODE_16BIT),
                 raw_capture.start.eq(self.capture_start),
                 raw_capture.stop.eq(self.capture_stop),
