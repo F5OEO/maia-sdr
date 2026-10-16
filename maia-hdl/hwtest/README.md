@@ -177,6 +177,44 @@ the frame period (largest gap in any run 143 ms for a 100 ms period, once, at
 20 MS/s on the Pluto+; no phase jump there, so it was delivery jitter). The phase of a single tone between frames is not predictable
 here (second difference 0.25 to 0.6 rad rms, the reference drift).
 
+## Combined with the open fixes (tezuka firmware, both boards, 2026-10-16)
+
+The firmware (tezuka_fw v0.3.23) does not build its bitstreams from the
+`pluto_iio` and `plutoplus_iio` projects of this repository but from the
+`tezuka` project (`maia-hdl/projects/tezuka`) of the `refactor` line, which
+has its own block design. The same HP0/HP3 scheme as above (raw capture on
+HP3 with the CPU clock, I/Q on HP0 with the maia_sdr clock and its own reset
+generator, same reset_timing constraints) was applied there, in
+`projects/common/maia.tcl`, on a branch that combines this PR with the open
+fix PRs (#14 to #23) and the DDC routing patches of maia-httpd
+(`test/allfixes-pr12-iqfix` in the fork). Images: tezuka_fw v0.3.23 plus the
+eight open tezuka_fw fix PRs, the device-tree nodes and these bitstreams
+(`test/allfixes-pr12-layout`, `test/allfixes-pr12-iqfix` in the fork); Pluto
+`v0.3.23-16-g8a1b74d`, Pluto+ `v0.3.23-15-g9ebeaf2`. Timing (Vivado 2023.2):
+Pluto WNS +0.192 ns, WHS +0.015 ns, no failing endpoints; the Pluto+ build is
+the one verified earlier (WNS +0.069 ns, WHS +0.025 ns).
+
+Run on both boards over the cable (the other board transmits), all passing:
+BIST check, `rf_iq_check.py`, `rf_phase_check.py` and
+`rf_iq_frame_phase_check.py` at 2.5, 10, 20, 30.72 and 61.44 MS/s.
+Frame-to-frame rotation of the I/Q waterfall, measured minus predicted:
+Pluto -0.0017 to +0.0003 rad (scatter 0.0009 to 0.0019 rad), Pluto+ -0.0001
+to +0.0023 rad (scatter 0.0008 to 0.0013 rad), no frame off by more than
+0.3 rad. OFDM log correlation of magnitude and I/Q waterfalls 0.989 to
+0.999 (Pluto, RX gain 52). Phase-derived minus time-domain frequency: Pluto
+-18 to +6 Hz, Pluto+ -8 to +3 Hz, within the check's 150 Hz tolerance and
+mostly within the measured drift of the two board references.
+
+Notes: (1) the phase check's windowed-FFT model comparison showed a 175 to
+180 degree phase and 53 to 57 dB amplitude error on one tone in about nine
+(Pluto 2.5 MS/s, in one case together with a 180 degree I/Q-versus-raw
+difference); the check does not use it as a pass criterion, I believe it is
+a bin close to a null of the model with almost no signal but did not prove
+it. (2) On the Pluto+ the first BIST run after writing the SD card showed
+the same peak bin for the three tones; seven later runs, two of them after a
+clean reboot, were correct, and I do not have an explanation. (3) Not tested:
+absolute level (dBm) and boards other than these two.
+
 ## Bugs found with these tests (fixed in this PR)
 
 - `DmaBRAMWrite`: for 32-bit data the write address was shifted one bit
