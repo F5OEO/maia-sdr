@@ -10,6 +10,10 @@ adi_project_files pluto [list \
   "../pluto/system_constr.xdc" \
   "$ad_hdl_dir/library/common/ad_iobuf.v"]
 
+# reset_timing.xdc needs the synthesized netlist to resolve cell names
+add_files -fileset constrs_1 -norecurse [file normalize [file join [file dirname [info script]] ../pluto/reset_timing.xdc]]
+set_property used_in_synthesis false [get_files reset_timing.xdc]
+
 # use improved implementation strategy for best timing results
 set_property strategy Performance_ExplorePostRoutePhysOpt [get_runs impl_1]
 
