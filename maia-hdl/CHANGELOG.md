@@ -14,8 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   AXI4-Lite register support for it in the Maia SDR top-level
   (`raw_capture_registers`). This widens the top-level's AXI4-Lite
   address width from 4 to 5 bits -- an API-breaking HDL interface change
-  for anyone instantiating `MaiaSDR` directly. Not yet simulated or
-  tested on hardware.
+  for anyone instantiating `MaiaSDR` directly. Simulated and tested on
+  hardware (Pluto+), see `hwtest/README.md`.
+- Hardware tests of the raw capture and the I/Q waterfall in `hwtest/`
+  (BIST tone, real signal over a cable, phase check), with the results at
+  2.5, 10, 20, 30.72 and 61.44 MS/s on a Pluto+.
+- Cocotb tests of the I/Q path under AXI backpressure, of the raw capture
+  strobe and a unit test of `DmaBRAMWrite` addresses.
+
+### Fixed
+
+- `DmaBRAMWrite` write address for 32-bit data (shifted by one bit).
+- Raw capture stored every sample three times.
 
 ## 0.6.1 - 2024-11-30
 
