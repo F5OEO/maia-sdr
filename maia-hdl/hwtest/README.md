@@ -63,7 +63,7 @@ same HP0/HP3 scheme; the wiring in this PR was then checked on a Pluto+
 image built from this branch (tezuka_fw v0.3.23 plus a bitstream from
 `plutoplus_iio`, device-tree nodes and maia-httpd from this tree): the BIST
 check, `rf_iq_check.py` at 2.5, 10 and 61.44 MS/s and `rf_phase_check.py`
-at 10 and 61.44 MS/s all pass, with the same figures as in the table.
+at 10 and 61.44 MS/s all pass, with figures comparable to the table.
 `pluto_iio` was built (timing met) but not run: the original Pluto was
 not flashed.
 
