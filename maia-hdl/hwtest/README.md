@@ -55,6 +55,9 @@ libiio tools (`iio_readdev`) on the host. The RF tests need a second board
   docstring): frame-to-frame phase advance against a time-domain frequency
   measurement, bin-to-bin phase against a windowed-FFT model, I/Q waterfall
   against raw capture.
+- `rf_iq_frame_phase_check.py --fs <rate>`: phase between consecutive I/Q
+  waterfall frames (see the docstring and the results section). Changes
+  `number_integrations` through the API and restores it.
 
 ## Results (Pluto+, 40 dB cable, 2.4 GHz LO, 2026-10-16)
 
@@ -139,6 +142,41 @@ degree. The cause was not investigated (the 2.5 MS/s Pluto+ run had a
 similar half-bin tone, but the tone positions of these runs were not
 checked against the bin centres). The 20 and 30.72 MS/s tones are all within 1.1 degrees.
 
+## Phase between I/Q waterfall frames (both boards, 2026-10-16)
+
+`rf_iq_frame_phase_check.py`: two tones from one TX buffer, 51 buffer
+periods (8.356 bins, not a whole number) apart. A single tone cannot be
+used: the frames are 68 to 100 ms apart and the references drift by tens of
+Hz. The phase of X1 * conj(X2) at the two peak bins rotates at the
+difference frequency as the receiver sees it, which is known: the TX
+buffer difference scaled by the sample clock ratio, taken from the carrier
+offset (delta, about +-20.4 ppm, measured with a single tone in the time
+domain). The prediction per frame is
+`2 pi (f1 - f2) (1 + delta) nint 4096 / fs`; a lost frame or a spacing off
+by one FFT frame (4096 samples) changes the rotation (by 2.2 rad for the
+latter). `number_integrations` is set for about 100 ms between frames (68 ms
+at 61.44 MS/s, nint 1023) and restored afterwards. 101 frames (148 at
+61.44) per run, 40 dB cable, 2.4 GHz LO, same images as above.
+
+| Board | Rate (MS/s) | nint | Frames | Measured - predicted (rad) | Scatter (rad) | Frames off by > 0.3 rad |
+|---|---|---|---|---|---|---|
+| Pluto | 2.5 | 61 | 101 | 0.0001 | 0.0009 | 0 |
+| Pluto | 10 | 244 | 101 | 0.0004 | 0.0010 | 0 |
+| Pluto | 20 | 488 | 101 | 0.0000 | 0.0012 | 0 |
+| Pluto | 30.72 | 749 | 101 | -0.0005 | 0.0014 | 0 |
+| Pluto | 61.44 | 1023 | 148 | -0.0018 | 0.0020 | 0 |
+| Pluto+ | 2.5 | 61 | 101 | 0.0001 | 0.0010 | 0 |
+| Pluto+ | 10 | 244 | 101 | 0.0003 | 0.0009 | 0 |
+| Pluto+ | 20 | 488 | 101 | 0.0010 | 0.0009 | 0 |
+| Pluto+ | 30.72 | 750 | 101 | 0.0020 | 0.0010 | 0 |
+| Pluto+ | 61.44 | 1023 | 148 | 0.0035 | 0.0015 | 0 |
+
+So the I/Q frames are phase coherent and exactly `nint * 4096` samples
+apart, with no lost frame. The arrival interval over the websocket matches
+the frame period (largest gap in any run 143 ms for a 100 ms period, once, at
+20 MS/s on the Pluto+; no phase jump there, so it was delivery jitter). The phase of a single tone between frames is not predictable
+here (second difference 0.25 to 0.6 rad rms, the reference drift).
+
 ## Bugs found with these tests (fixed in this PR)
 
 - `DmaBRAMWrite`: for 32-bit data the write address was shifted one bit
@@ -156,8 +194,6 @@ checked against the bin centres). The 20 and 30.72 MS/s tones are all within 1.1
 
 ## Not tested
 
-- Phase between I/Q waterfall frames (they are `number_integrations`
-  frames apart).
 - Absolute level (dBm); the scale is uncalibrated.
 - Boards other than the Pluto+ and the original Pluto (the DMA masters are
   not wired on the others in this repository).
