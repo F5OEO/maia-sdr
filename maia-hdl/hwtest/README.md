@@ -22,11 +22,20 @@ and with the magnitude waterfall.
 
 The two DMA masters (`m_axi_spectrometer_raw`, `m_axi_spectrometer_iq`)
 must be connected to the PS7 in the Vivado project and the device tree
-needs reserved-memory nodes for their buffers. On the Pluto+ test build
-the raw master is on HP3 and the I/Q master on HP0 (through an
-interconnect), with a clock association of the raw master in
-`package_ip.tcl` and implementation-only false paths for the reset.
-Other boards need the same wiring.
+needs reserved-memory nodes for their buffers (`raw_capture` at
+0x1a100000 and `iq_waterfall` at 0x1a200000, see `config.py`).
+
+`projects/pluto/system_bd.tcl` does this for the `maia_iio` builds
+(`pluto_iio`, `plutoplus_iio`): the raw master is on HP3 (CPU clock) and
+the I/Q master on HP0 (maia_sdr clock, own reset generator), the raw
+master is associated with the `s_axi_lite` clock in `package_ip.tcl`, and
+`projects/pluto/reset_timing.xdc` waives the recovery/removal checks on the
+asynchronous resets of the HP interconnects and of the raw FIFO. The other
+projects (`pluto`, `plutoplus`, e200, fishball, libre, ...) still leave the
+two masters unconnected.
+
+Vivado 2023.2, `plutoplus_iio` and `pluto_iio`: WNS +0.189 ns, WHS +0.017
+ns, no failing endpoints (the two have the same figures).
 
 ## Scripts
 
@@ -48,6 +57,15 @@ libiio tools (`iio_readdev`) on the host. The RF tests need a second board
   against raw capture.
 
 ## Results (Pluto+, 40 dB cable, 2.4 GHz LO, 2026-10-16)
+
+The table was measured with the wiring of an integration branch with the
+same HP0/HP3 scheme; the wiring in this PR was then checked on a Pluto+
+image built from this branch (tezuka_fw v0.3.23 plus a bitstream from
+`plutoplus_iio`, device-tree nodes and maia-httpd from this tree): the BIST
+check, `rf_iq_check.py` at 2.5, 10 and 61.44 MS/s and `rf_phase_check.py`
+at 10 and 61.44 MS/s all pass, with the same figures as in the table.
+`pluto_iio` was built (timing met) but not run: the original Pluto was
+not flashed.
 
 Build-verified in simulation: the Spectrometer cocotb suite (5 pass, 2
 opt-in exact tests skipped) and `test/test_dma.py` (3 tests). Everything

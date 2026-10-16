@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hardware tests of the raw capture and the I/Q waterfall in `hwtest/`
   (BIST tone, real signal over a cable, phase check), with the results at
   2.5, 10, 20, 30.72 and 61.44 MS/s on a Pluto+.
+- HP0/HP3 wiring of the raw capture and I/Q waterfall DMA masters in the
+  `pluto_iio` and `plutoplus_iio` projects (`projects/pluto/system_bd.tcl`).
 - Cocotb tests of the I/Q path under AXI backpressure, of the raw capture
   strobe and a unit test of `DmaBRAMWrite` addresses.
 
