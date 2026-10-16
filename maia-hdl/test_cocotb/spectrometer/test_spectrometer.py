@@ -377,6 +377,31 @@ async def test_raw_capture_through_spectrometer(dut):
 
 
 @cocotb.test()
+async def test_raw_capture_strobe_is_single_pulse(dut):
+    """The raw tap lives in the clk3x domain but strobe_in is a one-clk
+    (sync) pulse, so it is seen for 3 clk3x cycles. Recorder16IQ must get
+    exactly one strobe per sample: with strobe_in high every clk cycle,
+    the raw capture strobe has to be high in one clk3x cycle per clk
+    cycle, not in all three (which wrote every sample three times)."""
+    tb = SpectrometerTB(dut)
+    tb.start_clocks()
+    await tb.reset(nint=20, warmup=True)
+    cocotb.start_soon(tb.drive_dc(DC_AMPLITUDE, 0, 20_000))
+    await ClockCycles(dut.clk, 200)
+
+    core = dut.dut.spectrometer
+    rising3x = RisingEdge(dut.clk3x_clk)
+    n3x = 3 * 3000
+    count = 0
+    for _ in range(n3x):
+        await rising3x
+        count += int(core.raw_capture.strobe_in.value)
+    assert abs(count - n3x // 3) <= 3, (
+        f'raw capture strobe high in {count} of {n3x} clk3x cycles, '
+        f'expected {n3x // 3} (one per clk cycle)')
+
+
+@cocotb.test()
 async def test_abort_and_nint_change_sanity(dut):
     """Sanity check (liveness, not bit-exact correctness) that both
     the magnitude and I/Q channels keep producing completions after an

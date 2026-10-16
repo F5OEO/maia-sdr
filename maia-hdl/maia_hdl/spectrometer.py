@@ -285,13 +285,18 @@ class Spectrometer(Elaboratable):
             # integrator's CpwrPeak stage discards phase. Same domain_3x
             # assumption the integrator itself already makes for fft.re_out/
             # im_out (no explicit CDC there either).
-            # One pipeline register on the tap (data and strobe together, so
-            # they stay aligned) keeps the FFT output's fanout off the
-            # Recorder16IQ FIFO write path, which failed timing at 187.5 MHz.
+            # The data and strobe are registered in the sync domain, like
+            # the I/Q tap below, so they are stable for the 3 clk3x cycles
+            # of each sample. strobe_in is a one-cycle sync pulse, i.e. it
+            # lasts 3 clk3x cycles: it is gated with common_edge_3x so that
+            # Recorder16IQ (clk3x) sees exactly one strobe per sample.
+            # Without this every sample was written 3 times. The register
+            # also keeps the FFT output's fanout off the Recorder16IQ FIFO
+            # write path, which failed timing at 187.5 MHz.
             raw_re_q = Signal(16)
             raw_im_q = Signal(16)
             raw_strobe_q = Signal()
-            m.d[self._domain_3x] += [
+            m.d.sync += [
                 raw_re_q.eq(fft.re_out >> trunc),
                 raw_im_q.eq(fft.im_out >> trunc),
                 raw_strobe_q.eq(self.strobe_in),
@@ -299,7 +304,8 @@ class Spectrometer(Elaboratable):
             m.d.comb += [
                 raw_capture.re_in.eq(raw_re_q),
                 raw_capture.im_in.eq(raw_im_q),
-                raw_capture.strobe_in.eq(raw_strobe_q),
+                raw_capture.strobe_in.eq(
+                    raw_strobe_q & self.common_edge_3x),
                 raw_capture.mode.eq(RecorderMode.MODE_16BIT),
                 raw_capture.start.eq(self.capture_start),
                 raw_capture.stop.eq(self.capture_stop),
