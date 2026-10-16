@@ -112,8 +112,9 @@ takes it with `--offset`), and `--rx-gain 52` was used for the
 - BIST check (0.96, 1.92 and 3.84 MHz): I/Q and magnitude peaks equal,
   log-spectrum correlation 0.9999997 or better, raw multiset match 15/15
   and 16/16 twice, one distinct raw frame.
-- `rf_iq_check.py`: passes at 10 MS/s (OFDM log corr 0.986) and 61.44 MS/s
-  (0.994). At 2.5 MS/s the tones pass with the right offset and the OFDM
+- `rf_iq_check.py`: passes at 10 MS/s (OFDM log corr 0.986), 20 MS/s
+  (0.998, in/out band 27.0 / 25.7 dB), 30.72 MS/s (0.998, 26.0 / 24.9 dB)
+  and 61.44 MS/s (0.994); peaks of magnitude, I/Q and raw capture agree. At 2.5 MS/s the tones pass with the right offset and the OFDM
   test passes at RX gain 52 (corr 0.9892, in/out band 35.9 dB magnitude /
   29.6 dB I/Q). At the default gain 40 the OFDM correlation is 0.9765
   (below the 0.98 threshold, in/out band 26.7 / 17.7 dB): this link is
@@ -127,6 +128,8 @@ takes it with `--offset`), and `--rx-gain 52` was used for the
 |---|---|---|---|---|---|
 | 2.5 | -5.5, -5.4, -4.1 | 0.006 | <= 2.7 deg / 0.35 dB | 16.2, 3.5, 6.5 | 25 to 40 |
 | 10 | -2.2, -1.7, -0.2 | 0.003 to 0.004 | <= 3.2 deg / 0.36 dB | 3.9, 0.5, 0.8 | 5 to 8 |
+| 20 | 1.1, -0.4, -0.4 | 0.006 | <= 0.9 deg / 0.28 dB | 0.7, 2.7, 0.8 | 9 to 10 |
+| 30.72 | -0.1, 0.8, 0.3 | 0.005 to 0.006 | <= 1.1 deg / 0.23 dB | 3.4, 0.8, 1.0 | 3.5 to 10 |
 | 61.44 | 7.3, 7.3, 5.8 | 0.004 | <= 2.8 deg / 0.2 dB | 1.0, 3.9, 0.9 | 55 to 86 |
 
 One tone per rate (the first at 2.5 and 10 MS/s, the second at 61.44)
@@ -134,7 +137,7 @@ shows a model error of 2.7 to 3.2 degrees and the first 2.5 MS/s tone a
 16 degree I/Q-versus-raw difference; the other tones are within 1
 degree. The cause was not investigated (the 2.5 MS/s Pluto+ run had a
 similar half-bin tone, but the tone positions of these runs were not
-checked against the bin centres). 20 and 30.72 MS/s were not run on the Pluto.
+checked against the bin centres). The 20 and 30.72 MS/s tones are all within 1.1 degrees.
 
 ## Bugs found with these tests (fixed in this PR)
 
@@ -157,6 +160,5 @@ checked against the bin centres). 20 and 30.72 MS/s were not run on the Pluto.
   frames apart).
 - Absolute level (dBm); the scale is uncalibrated.
 - Boards other than the Pluto+ and the original Pluto (the DMA masters are
-  not wired on the others in this repository), and the Pluto at 20 and
-  30.72 MS/s.
+  not wired on the others in this repository).
 - Modulated signals against the raw capture beyond peak position.
