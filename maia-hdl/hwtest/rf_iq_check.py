@@ -65,7 +65,14 @@ async def run(a):
     ok = True
     try:
         hwlib.configure(a.tx, a.rx, fs, bw, a.lo, a.rx_gain)
-        offset = a.offset
+        if a.offset == 'auto':
+            # carrier offset between the boards from a single tone in the time domain
+            f0 = hwlib.tone_freq(fs, 2050)
+            hwlib.start_tx(a.tx, hwlib.tone(fs, f0), 6000)
+            offset = hwlib.td_freq(hwlib.td_capture(a.rx), fs) - f0
+            print(f'carrier offset {offset:.0f} Hz (measured)', flush=True)
+        else:
+            offset = float(a.offset)
         for k in (2050, -6000):
             f = hwlib.tone_freq(fs, k)
             hwlib.start_tx(a.tx, hwlib.tone(fs, f), 6000)
@@ -111,9 +118,11 @@ def main():
     ap.add_argument('--rx', default='192.168.3.1')
     ap.add_argument('--lo', type=int, default=2_400_000_000)
     ap.add_argument('--rx-gain', type=int, default=40)
-    ap.add_argument('--offset', type=float, default=-49_500.0,
-                    help='carrier offset between the boards in Hz (about '
-                    '-20 ppm of the LO for the two test boards)')
+    ap.add_argument('--offset', default='auto',
+                    help='carrier offset between the boards in Hz, or auto '
+                    '(default): measured from a tone in the time domain. It '
+                    'is about +-20 ppm of the LO for the two test boards and '
+                    'drifts by a kHz or so, so a fixed value goes stale')
     raise SystemExit(asyncio.run(run(ap.parse_args())))
 
 

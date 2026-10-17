@@ -108,8 +108,10 @@ reserved-memory nodes (the Pluto build uses its own copy of the device
 tree under `board/tezuka/pluto/kernel-dts`, which has to carry them too)
 and maia-httpd from this tree. The link is reversed: Pluto+ TX into
 Pluto RX over the same 40 dB cable, 2.4 GHz LO. The tone offset in this
-direction is +48.9 kHz (measured from the peak bins; `rf_iq_check.py`
-takes it with `--offset`), and `--rx-gain 52` was used for the
+direction was +48.9 kHz at that time and has since measured +49.4 to
++49.9 kHz (the references drift by about a kHz, so a fixed value goes
+stale); `rf_iq_check.py` now measures it from a time-domain tone
+(`--offset auto`, the default; a number in Hz still works), and `--rx-gain 52` was used for the
 `rf_iq_check.py` OFDM test at 2.5 MS/s and for all phase runs.
 
 - BIST check (0.96, 1.92 and 3.84 MHz): I/Q and magnitude peaks equal,
