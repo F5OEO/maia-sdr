@@ -66,7 +66,8 @@ async def run(a):
     try:
         hwlib.configure(a.tx, a.rx, fs, bw, a.lo, a.rx_gain)
         if a.offset == 'auto':
-            # carrier offset between the boards from a single tone in the time domain
+            # carrier offset between the boards, from a single tone in the
+            # time domain
             f0 = hwlib.tone_freq(fs, 2050)
             hwlib.start_tx(a.tx, hwlib.tone(fs, f0), 6000)
             offset = hwlib.td_freq(hwlib.td_capture(a.rx), fs) - f0
@@ -79,8 +80,8 @@ async def run(a):
             expect = int(round(2048 + (f + offset) / (fs / hwlib.FRAME)))
             r, _, _ = await measure(a.rx, f'cw {f:.0f} Hz', br, expect)
             good = (r['mag_peak'] in (expect - 1, expect, expect + 1)
-                    # a tone near a half-bin position can put the peak of a single
-                    # frame on either neighbouring bin
+                    # a tone near a half-bin position can put the peak of a
+                    # single frame on either neighbouring bin
                     and all(abs(k - r['mag_peak']) <= 1 for k in r['iq_peak'])
                     and r['raw_vs_mag_linear_corr'] > 0.99)
             ok &= good
