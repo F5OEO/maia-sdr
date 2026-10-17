@@ -79,7 +79,9 @@ async def run(a):
             expect = int(round(2048 + (f + offset) / (fs / hwlib.FRAME)))
             r, _, _ = await measure(a.rx, f'cw {f:.0f} Hz', br, expect)
             good = (r['mag_peak'] in (expect - 1, expect, expect + 1)
-                    and r['iq_peak'] == [r['mag_peak']]
+                    # a tone near a half-bin position can put the peak of a single
+                    # frame on either neighbouring bin
+                    and all(abs(k - r['mag_peak']) <= 1 for k in r['iq_peak'])
                     and r['raw_vs_mag_linear_corr'] > 0.99)
             ok &= good
             print(json.dumps(r), 'ok' if good else 'FAIL', flush=True)

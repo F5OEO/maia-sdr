@@ -49,8 +49,9 @@ libiio tools (`iio_readdev`) on the host. The RF tests need a second board
   magnitude peak bin, log spectra correlate, and every value of the raw
   capture appears 64 times as often as in one I/Q frame.
 - `rf_iq_check.py --fs <rate>`: CW tones, noise reference and CP-OFDM
-  through the cable; magnitude, I/Q and raw capture peaks agree, OFDM log
-  spectra of magnitude and I/Q correlate.
+  through the cable; magnitude, I/Q and raw capture peaks agree (the peak of
+  a single I/Q frame may sit on a neighbouring bin when the tone is near a
+  half-bin position), OFDM log spectra of magnitude and I/Q correlate.
 - `rf_phase_check.py --fs <rate>`: phase check with CW tones (see the
   docstring): frame-to-frame phase advance against a time-domain frequency
   measurement, bin-to-bin phase against a windowed-FFT model, I/Q waterfall
