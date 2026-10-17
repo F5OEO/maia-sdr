@@ -263,9 +263,6 @@ class MaiaSDR(Elaboratable):
         self.decim_re_out = Signal(signed(16))
         self.decim_im_out = Signal(signed(16))
         self.decim_strobe_out = Signal()
-        
-        
-        
 
     def ports(self):
         return (
@@ -305,7 +302,7 @@ class MaiaSDR(Elaboratable):
             self.clk2x,
             self.clk3x,
         ]
-        
+
         s_axi_lite_renamer = DomainRenamer({'sync': 's_axi_lite'})
         m.submodules.axi4lite = s_axi_lite_renamer(self.axi4lite)
         m.submodules.control_registers = s_axi_lite_renamer(
@@ -339,21 +336,21 @@ class MaiaSDR(Elaboratable):
         m.d.comb += [rxiq_cdc.re_in.eq(self.re_in),
                      rxiq_cdc.im_in.eq(self.im_in)]
 
-        #CDC ddc out
+        # CDC ddc out
         ddc_re_out = Signal(signed(16))
         ddc_im_out = Signal(signed(16))
         ddc_strobe_out = Signal()
 
         m.submodules.ddciq_cdc = ddciq_cdc = RxIQCDC(
-             'sync','sampling', 16)
+             'sync', 'sampling', 16)
         m.d.comb += [ddciq_cdc.re_in.eq(self.ddc.re_out),
                      ddciq_cdc.im_in.eq(self.ddc.im_out)]
 
-        #m.d.sync += [
+        # m.d.sync += [
         #        ddc_re_out.eq(ddciq_cdc.re_out),
         #        ddc_im_out.eq(ddciq_cdc.im_out),
         #        ddc_strobe_out.eq(ddciq_cdc.strobe_out),
-        #]
+        # ]
 
         # Spectrometer (sync domain)
         spectrometer_re_in = Signal(
@@ -367,7 +364,7 @@ class MaiaSDR(Elaboratable):
             m.d.sync += [
                 spectrometer_re_in.eq(self.ddc.re_out),
                 spectrometer_im_in.eq(self.ddc.im_out),
-                spectrometer_strobe_in.eq(self.ddc.strobe_out),                
+                spectrometer_strobe_in.eq(self.ddc.strobe_out),
             ]
         with m.Else():
             shift = self.spectrometer.width_in - self.iq_in_width
@@ -381,8 +378,8 @@ class MaiaSDR(Elaboratable):
         m.d.sync += [
                 self.decim_re_out.eq(self.ddc.re_out >> 4),
                 self.decim_im_out.eq(self.ddc.im_out >> 4),
-                self.decim_strobe_out.eq(self.ddc.strobe_out),                
-            ]    
+                self.decim_strobe_out.eq(self.ddc.strobe_out),
+            ]
         m.d.comb += [
             self.spectrometer.strobe_in.eq(spectrometer_strobe_in),
             self.spectrometer.common_edge_2x.eq(common_edge_2x.common_edge),
@@ -404,8 +401,8 @@ class MaiaSDR(Elaboratable):
                 self.spectrometer.last_buffer),
             self.clk_fastlock_out.eq(self.spectrometer.end_fft),
             self.spectrometer.fastlock_profile.eq(self.fastlock_profile_in),
-              
-              
+
+
 
         ]
 
@@ -559,7 +556,7 @@ class MaiaSDR(Elaboratable):
             self.control_registers['control']['sdr_reset'])
 
         m.d.comb += ddciq_cdc.reset.eq(
-            self.control_registers['control']['sdr_reset'])    
+            self.control_registers['control']['sdr_reset'])
 
         # Interrupts (s_axi_lite domain)
         interrupts_reg = self.control_registers['interrupts']

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 
+
 def convert_taps_line(input_file, output_file, scale=32768):
     """
     Convert a single-line 'taps = ...' file into a Vivado .coe file
@@ -62,4 +63,3 @@ if __name__ == "__main__":
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     convert_taps_line(input_file, output_file)
-

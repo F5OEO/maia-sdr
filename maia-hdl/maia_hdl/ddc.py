@@ -153,7 +153,7 @@ class DDC(Elaboratable):
 
         m.d.comb += [
             mixer.common_edge.eq(self.common_edge),
-            #mixer.clken.eq(self.enable_input & self.strobe_in),
+            # mixer.clken.eq(self.enable_input & self.strobe_in),
             mixer.clken.eq(self.strobe_in),
             mixer.frequency.eq(self.frequency),
             mixer.re_in.eq(self.re_in),
@@ -177,7 +177,8 @@ class DDC(Elaboratable):
         m.submodules.inbuff = inbuff = clk3x_renamer(SkidBuffer(2 * self.iw))
         m.d.comb += [
             inbuff.in_data.eq(Cat(mixer.re_out, mixer.im_out)),
-            #inbuff.in_valid.eq(self.enable_input & self.common_edge & self.strobe_in),
+            # inbuff.in_valid.eq(self.enable_input & self.common_edge &
+            #                    self.strobe_in),
             inbuff.in_valid.eq(self.common_edge & self.strobe_in),
             decimator.re_in.eq(inbuff.out_data[:self.iw]),
             decimator.im_in.eq(inbuff.out_data[-self.iw:]),

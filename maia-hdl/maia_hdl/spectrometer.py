@@ -272,8 +272,8 @@ class Spectrometer(Elaboratable):
             dma.rdata.eq(dma_rdata),
             dma.start.eq(integrator.done),
             self.last_buffer.eq(dma.last_buffer),
-   #         self.end_fft.eq(integrator.done), 
-            self.end_fft.eq(integrator.nearly_end), 
+            # self.end_fft.eq(integrator.done),
+            self.end_fft.eq(integrator.nearly_end),
             self.interrupt_out.eq(~dma.busy & dma_busy_q),
 
         ]
