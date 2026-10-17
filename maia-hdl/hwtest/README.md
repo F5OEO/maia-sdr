@@ -55,7 +55,11 @@ libiio tools (`iio_readdev`) on the host. The RF tests need a second board
 - `rf_phase_check.py --fs <rate>`: phase check with CW tones (see the
   docstring): frame-to-frame phase advance against a time-domain frequency
   measurement, bin-to-bin phase against a windowed-FFT model, I/Q waterfall
-  against raw capture.
+  against raw capture. The frames of the raw capture are aligned on the bins
+  around the peak (not on one bin), the model is fitted with a complex
+  amplitude per frame, and only bins at least 20 dB above the noise floor are
+  scored (`model_bins`); with the tone near a half-bin position the earlier
+  version could print errors of 180 degrees and tens of dB.
 - `rf_iq_frame_phase_check.py --fs <rate>`: phase between consecutive I/Q
   waterfall frames (see the docstring and the results section). Changes
   `number_integrations` through the API and restores it.
