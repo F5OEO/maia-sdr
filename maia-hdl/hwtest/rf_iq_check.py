@@ -52,8 +52,11 @@ async def measure(host, name, br, expect=None):
         res['expected_bin'] = expect
         r = raw_spectrum(raw, int(m.argmax()), br)
         res['raw_peak'] = int(r.argmax())
-        res['raw_vs_mag_linear_corr'] = round(float(
-            np.corrcoef(r, m)[0, 1]), 4)
+        # log spectra over the main lobe (the noise floor elsewhere is
+        # uncorrelated between the two captures)
+        k = slice(int(m.argmax()) - 4, int(m.argmax()) + 5)
+        res['raw_vs_mag_log_corr'] = round(float(np.corrcoef(
+            np.log10(r[k] + 1e-9), np.log10(m[k] + 1e-9))[0, 1]), 4)
     return res, m, p
 
 
@@ -83,7 +86,7 @@ async def run(a):
                     # a tone near a half-bin position can put the peak of a
                     # single frame on either neighbouring bin
                     and all(abs(k - r['mag_peak']) <= 1 for k in r['iq_peak'])
-                    and r['raw_vs_mag_linear_corr'] > 0.99)
+                    and r['raw_vs_mag_log_corr'] > 0.99)
             ok &= good
             print(json.dumps(r), 'ok' if good else 'FAIL', flush=True)
         hwlib.stop_tx(a.tx)
