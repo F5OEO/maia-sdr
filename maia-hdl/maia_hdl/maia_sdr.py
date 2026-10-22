@@ -316,22 +316,6 @@ class MaiaSDR(Elaboratable):
         m.d.comb += [rxiq_cdc.re_in.eq(self.re_in),
                      rxiq_cdc.im_in.eq(self.im_in)]
 
-        #CDC ddc out
-        ddc_re_out = Signal(signed(16))
-        ddc_im_out = Signal(signed(16))
-        ddc_strobe_out = Signal()
-
-        m.submodules.ddciq_cdc = ddciq_cdc = RxIQCDC(
-             'sync','sampling', 16)
-        m.d.comb += [ddciq_cdc.re_in.eq(self.ddc.re_out),
-                     ddciq_cdc.im_in.eq(self.ddc.im_out)]
-
-        #m.d.sync += [
-        #        ddc_re_out.eq(ddciq_cdc.re_out),
-        #        ddc_im_out.eq(ddciq_cdc.im_out),
-        #        ddc_strobe_out.eq(ddciq_cdc.strobe_out),
-        #]
-
         # Spectrometer (sync domain)
         spectrometer_re_in = Signal(
             self.spectrometer.width_in, reset_less=True)
@@ -633,9 +617,6 @@ class MaiaSDR(Elaboratable):
                 init=1))
         m.d.comb += rxiq_cdc.reset.eq(
             self.control_registers['control']['sdr_reset'])
-
-        m.d.comb += ddciq_cdc.reset.eq(
-            self.control_registers['control']['sdr_reset'])    
 
         # Interrupts (s_axi_lite domain)
         interrupts_reg = self.control_registers['interrupts']
