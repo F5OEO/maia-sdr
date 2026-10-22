@@ -3,7 +3,9 @@
 
 
 	create_bd_cell -type module -reference sweeper_it sweeper_io
-	ad_connect sweeper_io/clk maia_sdr/clk_fastlock_out
+	# Clock from the maia_sdr clock; end_fft is a data signal and is used as a step enable
+	ad_connect sweeper_io/clk maia_sdr_clk/clk_out1
+	ad_connect sweeper_io/step_in maia_sdr/clk_fastlock_out
 	ad_connect sweeper_io/reset axi_ad9361/rst
 	ad_connect sweeper_io/profile_o maia_sdr/fastlock_profile_in
 	ad_ip_instance util_vector_logic logic_orgpio [list \

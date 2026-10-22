@@ -1,0 +1,132 @@
+{
+ "label": "pluto-combined-da26cdf-61M44",
+ "time": "2026-10-11 20:42:20",
+ "sampling_frequency": "61440000",
+ "ddc_config": {
+  "enabled": false,
+  "frequency": 0.0,
+  "decimation": 20,
+  "input_sampling_frequency": 61440000.0,
+  "output_sampling_frequency": 3072000.0,
+  "max_input_sampling_frequency": 69444444.44444445
+ },
+ "board": [
+  "pluto",
+  "#1 SMP PREEMPT Sun Oct 11 07:47:11 CEST 2026"
+ ],
+ "F4_waterfall_profile": {
+  "frames": 48,
+  "frame_period_s": 0.0682,
+  "profiles_seen": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "first_32": [
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3
+  ],
+  "step_histogram": {
+   "1": 47
+  }
+ },
+ "F4_pads_outputs_low": [
+  "bank2 DIRM=0x00003e00 OEN=0x00003e00  EN_AGC(bit12) dir=out oe=1",
+  "samples=6143311 duration=10.0s",
+  "EN_AGC: rising_edges=0 high_fraction=0.0000 first_rise=-1.000s last_rise=-1.000s",
+  "CTRL_IN1..3 pad: transitions=147 bits_seen=0x7 histogram: 0:0.128 1:0.123 2:0.123 3:0.122 4:0.131 5:0.127 6:0.120 7:0.125"
+ ],
+ "F4_pads_restored": "bank2 DIRM=0x00002000 OEN=0x00003e00  EN_AGC(bit12) dir=in oe=1",
+ "F1": {
+  "routing_off_api": {
+   "http": "200",
+   "reg_0x790200BC": "0x00000000"
+  },
+  "cs16_routing_off": {
+   "rc": 0,
+   "bytes": 6144000,
+   "seconds": 0.1,
+   "stderr": "",
+   "msps": 15.36,
+   "nonzero": 0.737
+  },
+  "cs12_routing_off": {
+   "rc": 0,
+   "bytes": 3932160,
+   "seconds": 0.18,
+   "stderr": "",
+   "magic_count": 6,
+   "magic_gaps": [
+    272200,
+    351456,
+    460072,
+    706248,
+    1363184
+   ],
+   "nonzero": 0.925
+  },
+  "routing_on_api": {
+   "http": "200",
+   "reg_0x790200BC": "0x00000001"
+  },
+  "cs16_routing_on": {
+   "rc": 0,
+   "bytes": 6144000,
+   "seconds": 0.59,
+   "stderr": "",
+   "msps": 2.603,
+   "nonzero": 0.714
+  },
+  "cs12_routing_on": {
+   "rc": 0,
+   "bytes": 3932160,
+   "seconds": 0.53,
+   "stderr": "",
+   "magic_count": 5,
+   "magic_gaps": [
+    786432
+   ],
+   "nonzero": 0.797
+  },
+  "restore": {
+   "http": "200",
+   "reg_0x790200BC": "0x00000000"
+  },
+  "restore_fs": "30720000"
+ }
+}
