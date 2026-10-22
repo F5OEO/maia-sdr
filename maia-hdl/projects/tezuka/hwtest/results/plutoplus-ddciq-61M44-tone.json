@@ -1,0 +1,589 @@
+{
+ "fs": 61440000,
+ "tone_hz": 1920000,
+ "bist_level_db": 6,
+ "ddc_out": 3072000.0,
+ "routing_reg": "0x00000001",
+ "captures": [
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  },
+  {
+   "samples": 3072000,
+   "amp": 417.7,
+   "noise_lsb_i_q": [
+    0.86,
+    0.86
+   ],
+   "thr_lsb_q": 8.6,
+   "q_slip_detectable_fraction": 0.935,
+   "events": 2,
+   "q_lag": 0,
+   "q_lead": 0,
+   "i_lag": 0,
+   "i_lead": 0,
+   "dropout": 0,
+   "other": 0,
+   "where": [],
+   "tone_offset_hz": 99973.3
+  }
+ ],
+ "total": {
+  "samples": 92160000,
+  "q_lag": 0,
+  "q_lead": 0,
+  "i_lag": 0,
+  "i_lead": 0,
+  "dropout": 0,
+  "other": 0
+ },
+ "iq_misalign_per_million": 0.0
+}
