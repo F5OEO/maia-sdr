@@ -61,8 +61,21 @@ create_bd_cell -type module -reference cs12_8mux cs12_8mux_chan1
 # Inputs
 ad_connect util_ad9361_adc_fifo/dout_enable_2 cs12_8mux_chan1/Enable0
 ad_connect util_ad9361_adc_fifo/dout_enable_3 cs12_8mux_chan1/Enable1
-ad_connect util_ad9361_adc_fifo/dout_data_2 cs12_8mux_chan1/I0
-ad_connect util_ad9361_adc_fifo/dout_data_3 cs12_8mux_chan1/Q0
+# RX2 shares RX1's valid_in. With DDC routing on that is the DDC strobe, so RX2
+# would be picked every decimation-th sample with no filter and no mixer, and
+# out-of-band signals would alias into it. There is only one DDC, so deliver
+# zeros on RX2 while routing is on instead of aliased samples.
+ad_ip_instance xlconstant rx2_zero [list CONST_WIDTH 16 CONST_VAL 0]
+foreach {mux din dout} {mux_rx2_i dout_data_2 I0 mux_rx2_q dout_data_3 Q0} {
+  create_bd_cell -type module -reference ad_bus_mux $mux
+  ad_connect decim_slice/Dout $mux/select_path
+  ad_connect util_ad9361_adc_fifo/$din $mux/data_in_0
+  ad_connect rx2_zero/dout $mux/data_in_1
+  ad_connect $mux/data_out cs12_8mux_chan1/$dout
+  foreach pin {valid_in_0 valid_in_1 enable_in_0 enable_in_1} {
+    ad_connect $mux/$pin GND
+  }
+}
 
 ad_connect mux_decim_i/valid_out cs12_8mux_chan1/valid_in
 ad_connect cs12_8mux_chan1/clk util_ad9361_adc_fifo/dout_clk
