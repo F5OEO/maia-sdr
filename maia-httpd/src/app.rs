@@ -7,8 +7,9 @@
 use crate::{
     args::Args,
     fpga::{InterruptHandler, IpCore},
-    httpd::{self, RecorderFinishWaiter, RecorderState},
+    httpd::{self, RawCaptureFinishWaiter, RawCaptureState, RecorderFinishWaiter, RecorderState},
     iio::Ad9361,
+    iq_waterfall::IqWaterfall,
     spectrometer::{Spectrometer, SpectrometerConfig},
 };
 use anyhow::Result;
@@ -24,7 +25,9 @@ pub struct App {
     httpd: httpd::Server,
     interrupt_handler: InterruptHandler,
     recorder_finish: RecorderFinishWaiter,
+    raw_capture_finish: RawCaptureFinishWaiter,
     spectrometer: Spectrometer,
+    iq_waterfall: IqWaterfall,
 }
 
 impl App {
@@ -36,11 +39,13 @@ impl App {
         let ip_core = std::sync::Mutex::new(ip_core);
         let ad9361 = tokio::sync::Mutex::new(Ad9361::new().await?);
         let recorder = RecorderState::new(&ad9361, &ip_core).await?;
+        let raw_capture = RawCaptureState::new().await?;
         let state = AppState(Arc::new(State {
             ad9361,
             ip_core,
             geolocation: std::sync::Mutex::new(None),
             recorder,
+            raw_capture,
             spectrometer_config: Default::default(),
         }));
         // Initialize spectrometer sample rate and mode
@@ -52,14 +57,22 @@ impl App {
         // Build application objects
 
         let (waterfall_sender, _) = broadcast::channel(16);
+        let (iq_waterfall_sender, _) = broadcast::channel(16);
         let spectrometer = Spectrometer::new(
             state.clone(),
             interrupt_handler.waiter_spectrometer(),
             waterfall_sender.clone(),
         );
+        let iq_waterfall = IqWaterfall::new(
+            state.clone(),
+            interrupt_handler.waiter_iq_waterfall(),
+            iq_waterfall_sender.clone(),
+        );
 
         let recorder_finish =
             RecorderFinishWaiter::new(state.clone(), interrupt_handler.waiter_recorder());
+        let raw_capture_finish =
+            RawCaptureFinishWaiter::new(state.clone(), interrupt_handler.waiter_raw_capture());
 
         let httpd = httpd::Server::new(
             args.listen,
@@ -69,6 +82,7 @@ impl App {
             args.ca_cert.as_ref(),
             state,
             waterfall_sender,
+            iq_waterfall_sender,
         )
         .await?;
 
@@ -76,7 +90,9 @@ impl App {
             httpd,
             interrupt_handler,
             recorder_finish,
+            raw_capture_finish,
             spectrometer,
+            iq_waterfall,
         })
     }
 
@@ -89,7 +105,9 @@ impl App {
             ret = self.httpd.run() => ret,
             ret = self.interrupt_handler.run() => ret,
             ret = self.recorder_finish.run() => ret,
+            ret = self.raw_capture_finish.run() => ret,
             ret = self.spectrometer.run() => ret,
+            ret = self.iq_waterfall.run() => ret,
         }
     }
 }
@@ -109,6 +127,7 @@ struct State {
     ip_core: Mutex<IpCore>,
     geolocation: Mutex<Option<maia_json::Geolocation>>,
     recorder: RecorderState,
+    raw_capture: RawCaptureState,
     spectrometer_config: SpectrometerConfig,
 }
 
@@ -134,6 +153,11 @@ impl AppState {
     /// Gives access to the [`RecorderState`] object of the application.
     pub fn recorder(&self) -> &RecorderState {
         &self.0.recorder
+    }
+
+    /// Gives access to the [`RawCaptureState`] object of the application.
+    pub fn raw_capture(&self) -> &RawCaptureState {
+        &self.0.raw_capture
     }
 
     /// Gives access to the [`SpectrometerConfig`] object of the application.

@@ -18,6 +18,7 @@ pub struct IpCore {
     registers: Registers,
     phys_addr: usize,
     spectrometer: Dma,
+    iq_waterfall: Dma,
     // RAM-based cache for the number of spectrometer integrations and
     // mode. These are used to speed up IpCore::spectrometer_number_integrations
     // and IpCore::spectrometer_mode by avoiding to read the FPGA register.
@@ -68,6 +69,8 @@ pub struct InterruptHandler {
     registers: Registers, // should only access registers.interrupts
     notify_spectrometer: Arc<Notify>,
     notify_recorder: Arc<Notify>,
+    notify_raw_capture: Arc<Notify>,
+    notify_iq_waterfall: Arc<Notify>,
 }
 
 #[derive(Debug)]
@@ -240,11 +243,15 @@ impl IpCore {
         let spectrometer = Dma::new("maia-sdr-spectrometer")
             .await
             .context("failed to open maia-sdr-spectrometer DMA buffer")?;
+        let iq_waterfall = Dma::new("maia-sdr-iq-waterfall")
+            .await
+            .context("failed to open maia-sdr-iq-waterfall DMA buffer")?;
         let interrupt_registers = Registers(mapping.clone());
         let mut ip_core = IpCore {
             registers: Registers(mapping),
             phys_addr,
             spectrometer,
+            iq_waterfall,
             // These are initialized to the correct value below, after removing
             // the SDR reset.
             spectrometer_input: maia_json::SpectrometerInput::AD9361,
@@ -476,6 +483,32 @@ impl IpCore {
                     buff.len() / std::mem::size_of::<u64>(),
                 )
             })
+    }
+
+    /// Gives the value of the I/Q waterfall's last buffer register.
+    ///
+    /// This register indicates the index of the last buffer to which the
+    /// continuous I/Q waterfall channel has written.
+    pub fn iq_waterfall_last_buffer(&self) -> usize {
+        self.registers
+            .spectrometer()
+            .read()
+            .iq_last_buffer()
+            .bits()
+            .into()
+    }
+
+    /// Returns the new I/Q waterfall buffers that have been written since the
+    /// last call to this function.
+    ///
+    /// Unlike [`IpCore::get_spectrometer_buffers`], this does not decode the
+    /// floating-point mantissa+exponent encoding -- the FPGA already packs
+    /// 16-bit I and 16-bit Q per sample (see Spectrometer's iq_write_data in
+    /// maia-hdl), so the raw bytes are exactly the wire format this is
+    /// streamed to the browser in.
+    pub fn get_iq_waterfall_buffers(&mut self) -> impl Iterator<Item = &[u8]> {
+        self.iq_waterfall
+            .get_new_buffers(self.iq_waterfall_last_buffer())
     }
 
     fn set_ddc_enable(&mut self, enable: bool) {
@@ -772,6 +805,43 @@ impl IpCore {
     pub fn recorder_next_address(&self) -> usize {
         usize::try_from(self.registers.recorder_next_address().read().bits()).unwrap()
     }
+
+    /// Starts a raw complex FFT capture.
+    ///
+    /// The capture is a single-shot, fixed-size burst (one FFT frame's worth
+    /// of truncated I/Q samples) -- it ends on its own once the buffer is
+    /// full, there is no separate "stop" needed the way the recorder has,
+    /// but [`IpCore::raw_capture_stop`] exists to abort early.
+    pub fn raw_capture_start(&self) {
+        tracing::info!("starting raw capture");
+        self.registers
+            .raw_capture_control()
+            .modify(|_, w| w.start().set_bit());
+    }
+
+    /// Stops a currently running raw complex FFT capture.
+    pub fn raw_capture_stop(&self) {
+        tracing::info!("stopping raw capture");
+        self.registers
+            .raw_capture_control()
+            .modify(|_, w| w.stop().set_bit());
+    }
+
+    /// Gives the value of the next address register of the raw capture.
+    pub fn raw_capture_next_address(&self) -> usize {
+        usize::try_from(self.registers.raw_capture_next_address().read().bits()).unwrap()
+    }
+
+    /// Whether the raw capture dropped samples because the CDC FIFO
+    /// between the FFT's clock domain and the AXI write-master's domain
+    /// overflowed.
+    pub fn raw_capture_dropped_samples(&self) -> bool {
+        self.registers
+            .raw_capture_control()
+            .read()
+            .dropped_samples()
+            .bit()
+    }
 }
 
 macro_rules! impl_interrupt_handler {
@@ -825,7 +895,7 @@ impl InterruptHandler {
         }
     }
 
-    impl_interrupt_handler!(spectrometer, recorder);
+    impl_interrupt_handler!(spectrometer, recorder, raw_capture, iq_waterfall);
 }
 
 impl InterruptWaiter {

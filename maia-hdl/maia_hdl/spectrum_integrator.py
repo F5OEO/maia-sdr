@@ -228,8 +228,7 @@ class SpectrumIntegrator(Elaboratable):
                 with m.If((sum_counter == 2)):
                     m.d.sync += [
                         self.nearly_end.eq(1),
-                    ]    
-
+                    ]
 
         with m.If(self.abort):
             m.d.sync += do_abort.eq(1)

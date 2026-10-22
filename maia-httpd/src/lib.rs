@@ -12,6 +12,7 @@ pub mod ddc;
 pub mod fpga;
 pub mod httpd;
 pub mod iio;
+pub mod iq_waterfall;
 pub mod rxbuffer;
 pub mod sigmf;
 pub mod spectrometer;

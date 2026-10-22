@@ -1,0 +1,39 @@
+# Run as: COCOTB_RESOLVE_X=ZEROS make
+# See test_spectrometer.py's module docstring for why.
+
+# defaults
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+
+DUT = spectrometer
+# Force Verilog 2005 mode, since Verilog 2012 gives problems with initial value
+# for combinatorial blocks.
+VERILOG_SOURCES = -g2005
+VERILOG_SOURCES += dut.v
+VERILOG_SOURCES += tb.v
+VERILOG_SOURCES += ../../XilinxUnisimLibrary/verilog/src/glbl.v
+VERILOG_SOURCES += ../../XilinxUnisimLibrary/verilog/src/unisims/FIFO18E1.v
+TOPLEVEL = tb
+MODULE = test_$(DUT)
+
+COMPILE_ARGS += -Wall
+
+export PYTHONPATH := $(PWD)/../..:$(PWD)/..:$(PYTHONPATH)
+
+# include cocotb's make rules to take care of the simulator setup
+include $(shell cocotb-config --makefiles)/Makefile.sim
+
+.PHONY: dut.v
+dut.v:
+	python3 verilog.py
+
+.PHONY: -g2005
+-g2005:
+	echo "Verilog 2005 mode enabled"
+
+# The exact I/Q and magnitude comparisons only pass when run alone (see EXACT in
+# test_spectrometer.py), so each gets its own simulation.
+.PHONY: exact
+exact:
+	SPECTROMETER_EXACT=1 TESTCASE=test_iq_and_magnitude_exact $(MAKE) sim
+	SPECTROMETER_EXACT=1 TESTCASE=test_iq_and_magnitude_exact_backpressure $(MAKE) sim

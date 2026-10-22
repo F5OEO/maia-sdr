@@ -21,10 +21,11 @@ def maia_iio():
     config.recorder_address_range = (0x0600_0000, 0x1600_0000)
     return config
 
+
 def maia_iio_lite():
     """Configuration for Maia SDR + IIO with reduced memory"""
     config = MaiaSDRConfig()
     config.spectrometer_address = 0x1600_0000
-    #size only 0x8000000
+    # size only 0x8000000
     config.recorder_address_range = (0x0600_0000, 0xe00_0000)
     return config

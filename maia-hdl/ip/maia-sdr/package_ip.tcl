@@ -77,6 +77,9 @@ ipx::associate_bus_interfaces -busif s_axi_lite -clock clk -remove [ipx::current
 ipx::associate_bus_interfaces -busif s_axi_lite -clock s_axi_lite_clk [ipx::current_core]
 ipx::associate_bus_interfaces -busif m_axi_recorder -clock clk -remove [ipx::current_core]
 ipx::associate_bus_interfaces -busif m_axi_recorder -clock s_axi_lite_clk [ipx::current_core]
+# the raw capture DMA runs in the s_axi_lite (CPU) clock domain, like the recorder
+ipx::associate_bus_interfaces -busif m_axi_spectrometer_raw -clock clk -remove [ipx::current_core]
+ipx::associate_bus_interfaces -busif m_axi_spectrometer_raw -clock s_axi_lite_clk [ipx::current_core]
 
 # interrupt
 ipx::add_bus_interface interrupt [ipx::current_core]

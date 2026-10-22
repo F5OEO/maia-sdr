@@ -457,6 +457,51 @@ pub enum RecorderState {
     Stopping,
 }
 
+/// Raw complex FFT capture JSON schema.
+///
+/// This JSON schema corresponds to GET requests on `/api/raw-capture`. It
+/// contains the settings of the raw complex FFT capture (a single-shot,
+/// fixed-size burst of I/Q samples tapped before the spectrometer's
+/// integrator discards phase -- see maia-hdl's Spectrometer.raw_capture).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct RawCapture {
+    /// Current raw capture state.
+    pub state: RawCaptureState,
+    /// Whether samples were dropped during the last capture (the CDC FIFO
+    /// between the FFT's clock domain and the AXI write-master's domain
+    /// overflowed).
+    pub dropped_samples: bool,
+}
+
+/// Raw complex FFT capture PATCH JSON schema.
+///
+/// This JSON schema corresponds to PATCH requests on `/api/raw-capture`. It
+/// is used to start or stop a capture.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+pub struct PatchRawCapture {
+    /// Command to change the raw capture state.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_change: Option<RawCaptureStateChange>,
+}
+
+/// Command to change the raw complex FFT capture state.
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Hash)]
+pub enum RawCaptureStateChange {
+    /// Command the raw capture to start.
+    Start,
+    /// Command the raw capture to stop.
+    Stop,
+}
+
+/// Raw complex FFT capture state.
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Hash)]
+pub enum RawCaptureState {
+    /// The raw capture is stopped (a finished or not-yet-started capture).
+    Stopped,
+    /// The raw capture is running.
+    Running,
+}
+
 /// Geolocation.
 ///
 /// This is based on a GeoJSON point, but it is encoded differently in JSON.

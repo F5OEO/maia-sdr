@@ -104,9 +104,14 @@ class DmaBRAMWrite(Elaboratable):
         assert len(self.raddr) > burst_len_log2
         axi_addr_counter = Signal(
             self.num_buffers_log2 + len(self.raddr) - burst_len_log2)
+        # The low bits are padded with an explicit constant rather than with
+        # a left shift: in Amaranth the width of a shift by a constant
+        # Python int is len + 2**bits(shift) - 1, so a shift of 6 (32-bit
+        # words) is one bit wider than the burst address and moves the base
+        # address constant one bit up.
         m.d.comb += self.axi.awaddr.eq(
-            Cat(axi_addr_counter
-                << (burst_len_log2 + self.bytes_per_word_log2),
+            Cat(Const(0, burst_len_log2 + self.bytes_per_word_log2),
+                axi_addr_counter,
                 Const(self.base_address >> self.address_shift,
                       self.axi_awidth - self.address_shift)))
         with m.If(self.axi.aw_handshake()):
