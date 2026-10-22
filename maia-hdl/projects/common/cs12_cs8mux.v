@@ -37,11 +37,15 @@ module cs12_8mux #(
     reg signed [12:0] err_i;
     reg signed [12:0] err_q;
 
-    wire signed [13:0] acc_i_w = {{2{I0[11]}}, I0[11:0]} + err_i;
-    wire signed [13:0] acc_q_w = {{2{Q0[11]}}, Q0[11:0]} + err_q;
+    // CS8 noise-shaped rounding. All operands are signed: a concatenation or a
+    // part-select is unsigned in Verilog and would turn the whole expression
+    // unsigned (err_i would then be zero-extended instead of sign-extended).
+    wire signed [13:0] acc_i_w = $signed({{2{I0[11]}}, I0[11:0]}) + err_i;
+    wire signed [13:0] acc_q_w = $signed({{2{Q0[11]}}, Q0[11:0]}) + err_q;
 
-    wire signed [8:0] rnd_i_w = acc_i_w[13:4] + {8'sd0, acc_i_w[3]};
-    wire signed [8:0] rnd_q_w = acc_q_w[13:4] + {8'sd0, acc_q_w[3]};
+    // acc / 16 rounded half up
+    wire signed [8:0] rnd_i_w = (acc_i_w >>> 4) + $signed({1'b0, acc_i_w[3]});
+    wire signed [8:0] rnd_q_w = (acc_q_w >>> 4) + $signed({1'b0, acc_q_w[3]});
 
     wire signed [7:0] out_i_w = (rnd_i_w > 9'sd127) ? 8'sd127 :
                                 (rnd_i_w < -9'sd128) ? -8'sd128 :
@@ -51,8 +55,8 @@ module cs12_8mux #(
                                 (rnd_q_w < -9'sd128) ? -8'sd128 :
                                 rnd_q_w[7:0];
 
-    wire signed [12:0] err_i_next = acc_i_w - ({{5{out_i_w[7]}}, out_i_w} <<< 4);
-    wire signed [12:0] err_q_next = acc_q_w - ({{5{out_q_w[7]}}, out_q_w} <<< 4);
+    wire signed [12:0] err_i_next = acc_i_w - ($signed({{5{out_i_w[7]}}, out_i_w}) <<< 4);
+    wire signed [12:0] err_q_next = acc_q_w - ($signed({{5{out_q_w[7]}}, out_q_w}) <<< 4);
 
     assign Enable_O1 = (Enable0 | Enable1);
     assign Enable_O2 = Enable1;
