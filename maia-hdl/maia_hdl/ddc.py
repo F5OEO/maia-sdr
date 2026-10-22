@@ -148,8 +148,12 @@ class DDC(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
+        # The mixer output is one bit wider than the input: rotating a
+        # full-scale complex sample can make one component larger than the
+        # input range, and a width-bit output would wrap around.
+        mixw = self.iw + 1
         m.submodules.mixer = mixer = Mixer(
-            self._3x, self.iw, nco_width=self.nco_width)
+            self._3x, self.iw, out_width=mixw, nco_width=self.nco_width)
 
         m.d.comb += [
             mixer.common_edge.eq(self.common_edge),
@@ -163,7 +167,7 @@ class DDC(Elaboratable):
         clk3x_renamer = DomainRenamer({'sync': self._3x})
         m.submodules.decimator = decimator = clk3x_renamer(
             FIRDecimator3Stage(
-                in_width=self.iw, out_width=self.ow,
+                in_width=mixw, out_width=self.ow,
                 coeff_width=self.coeff_width, decim_width=self.decim_width,
                 oper_width=self.oper_width, macc_trunc=self.macc_trunc))
         for port in ['coeff_waddr', 'coeff_wren', 'coeff_wdata', 'decimation1',
@@ -174,13 +178,13 @@ class DDC(Elaboratable):
             m.d.comb += getattr(decimator, port).eq(getattr(self, port))
 
         # input CDC: sync -> 3x
-        m.submodules.inbuff = inbuff = clk3x_renamer(SkidBuffer(2 * self.iw))
+        m.submodules.inbuff = inbuff = clk3x_renamer(SkidBuffer(2 * mixw))
         m.d.comb += [
             inbuff.in_data.eq(Cat(mixer.re_out, mixer.im_out)),
             #inbuff.in_valid.eq(self.enable_input & self.common_edge & self.strobe_in),
             inbuff.in_valid.eq(self.common_edge & self.strobe_in),
-            decimator.re_in.eq(inbuff.out_data[:self.iw]),
-            decimator.im_in.eq(inbuff.out_data[-self.iw:]),
+            decimator.re_in.eq(inbuff.out_data[:mixw]),
+            decimator.im_in.eq(inbuff.out_data[-mixw:]),
             decimator.in_valid.eq(inbuff.out_valid),
             inbuff.out_ready.eq(decimator.in_ready),
         ]
