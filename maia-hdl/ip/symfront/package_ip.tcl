@@ -2,6 +2,7 @@
 
 create_project symfront . -force
 add_files symfront.v
+add_files -fileset constrs_1 -norecurse ../symfront.xdc
 set_property top top [current_fileset]
 load_features ipservices
 ipx::package_project -import_files -root_dir . -vendor maia-sdr.org -library user -taxonomy /Maia-SDR -force

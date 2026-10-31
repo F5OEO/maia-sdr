@@ -21,7 +21,7 @@ from amaranth import *
 from amaranth.lib.memory import Memory
 from amaranth.lib.fifo import AsyncFIFO
 from amaranth.lib.cdc import FFSynchronizer
-import amaranth.cli
+import amaranth.back.verilog
 
 from . import symfront_model as M
 from .axi4_lite import Axi4LiteRegisterBridge
@@ -213,21 +213,23 @@ class SymFront(Elaboratable):
 
         inv_arr = Array(Const(v, 16) for v in inv_t)
         isq_arr = Array(Const(v, 16) for v in isq_t)
+        # shift amounts depend only on e_exp (set in NORM2); they are
+        # registered in EMUL so that ESHIFT only holds the barrel shifts
         sh2 = Signal(6)
-        m.d.comb += sh2.eq(Mux(e_exp > 0, e_exp - 1, 0))
         osh = Signal(6)
-        m.d.comb += osh.eq(15 - M.OUT_FRAC + (e_exp >> 1))
+        rnd = Signal(33)
         e_shifted = Signal(signed(51))
         m.d.comb += e_shifted.eq(e_full >> sh2)
         emax = 2 << M.E_FRAC
-        osh1 = Signal(6)
-        m.d.comb += osh1.eq(osh - 1)
         o_r = Signal(signed(33))
         o_i = Signal(signed(33))
         m.d.comb += [
-            o_r.eq((ym_r + (Const(1, 33) << osh1)) >> osh),
-            o_i.eq((ym_i + (Const(1, 33) << osh1)) >> osh),
+            o_r.eq((ym_r + rnd) >> osh),
+            o_i.eq((ym_i + rnd) >> osh),
         ]
+        e_sh_q = Signal(signed(51))
+        o_r_q = Signal(signed(33))
+        o_i_q = Signal(signed(33))
 
         m.d.sync += self.out_valid.eq(0)
         with m.FSM():
@@ -305,14 +307,24 @@ class SymFront(Elaboratable):
                     e_full.eq(raw * inv),
                     ym_r.eq(yr * g),
                     ym_i.eq(yi * g),
+                    sh2.eq(Mux(e_exp > 0, e_exp - 1, 0)),
+                    osh.eq(15 - M.OUT_FRAC + (e_exp >> 1)),
+                    rnd.eq(Const(1, 33) << (14 - M.OUT_FRAC + (e_exp >> 1))),
                 ]
                 m.next = 'ESHIFT'
             with m.State('ESHIFT'):
-                m.d.sync += e.eq(Mux(e_shifted > emax, emax,
-                                     Mux(e_shifted < -emax, -emax, e_shifted)))
                 m.d.sync += [
-                    self.i_out.eq(_clamp(o_r, M.OUT_BITS)),
-                    self.q_out.eq(_clamp(o_i, M.OUT_BITS)),
+                    e_sh_q.eq(e_shifted),
+                    o_r_q.eq(o_r),
+                    o_i_q.eq(o_i),
+                ]
+                m.next = 'OUT'
+            with m.State('OUT'):
+                m.d.sync += e.eq(Mux(e_sh_q > emax, emax,
+                                     Mux(e_sh_q < -emax, -emax, e_sh_q)))
+                m.d.sync += [
+                    self.i_out.eq(_clamp(o_r_q, M.OUT_BITS)),
+                    self.q_out.eq(_clamp(o_i_q, M.OUT_BITS)),
                     self.out_valid.eq(1),
                 ]
                 m.next = 'LOOP1'
@@ -497,5 +509,11 @@ class SymFrontIP(Elaboratable):
 
 
 if __name__ == '__main__':
+    # Generate with the Xilinx platform so that the CDC synchronizers carry
+    # the amaranth.vivado.false_path attributes used by symfront.xdc
+    import sys
+    from .pluto_platform import PlutoPlatform
     dut = SymFrontIP()
-    amaranth.cli.main(dut, ports=dut.ports())
+    with open(sys.argv[-1], 'w') as f:
+        f.write(amaranth.back.verilog.convert(
+            dut, platform=PlutoPlatform(), ports=dut.ports()))
