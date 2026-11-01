@@ -19,11 +19,14 @@ Signal path (all integer arithmetic, mirrored by symfront.py):
 3. Interpolator: 8-tap Kaiser-free windowed sinc (raised cosine window, as
    zynqrx's SymbolTimer with halfSpanSymbols = 2), 512 fractional phases,
    coefficients Q14. Two outputs per symbol: y at the instant and m half a
-   symbol (one sample) earlier, with the same phase.
+   symbol earlier (t - sps / 2, with its own fractional phase; at 2 samples
+   per symbol this is one sample earlier with the same phase).
 4. Gardner timing error e = Re{m * conj(y - y_prev)}, normalised by the
    output power, clamped to +-2, PI loop filter, timing NCO
-   t += 2 * (1 - corr) (in samples, 24 fractional bits). As in zynqrx the
-   correction from a symbol's error is used for the next-but-one instant.
+   t += sps * (1 - corr) (in samples, 24 fractional bits; sps is a register,
+   2.0 - 8.0 samples per symbol, see sps_word()). The correction is taken in
+   Q24 and clamped to +-2 before the product. As in zynqrx the correction
+   from a symbol's error is used for the next-but-one instant.
 5. AGC: power P averaged over 4096 symbols (faster at start); y is scaled
    by 1/sqrt(P) through a mantissa table, output Q9 (unit power = 512)
    clamped to 12 bits.
@@ -47,6 +50,9 @@ K_FRAC = 24           # kp, ki
 MANT_BITS = 6         # mantissa bits of the power for the 1/P and 1/sqrt(P) tables
 OUT_FRAC = 9          # output symbols: unit power = 2**9, clamped to 12 bits (room for 32APSK peaks, fits the cs8 path)
 OUT_BITS = 12
+SPS_MIN = 2 << T_FRAC  # samples per symbol, Q24: 2.0 - 8.0
+SPS_MAX = 8 << T_FRAC
+CQ_MAX = (2 << T_FRAC) - 1   # correction clamp before the sps product (Q24, +-2)
 
 
 def nco_table():
@@ -100,6 +106,18 @@ def nco_step(freq_hz, fs_hz):
     return round(-freq_hz / fs_hz * (1 << NCO_BITS)) & ((1 << NCO_BITS) - 1)
 
 
+def sps_word(sps):
+    """sps register (Q24) for a number of samples per symbol (2.0 - 8.0)."""
+    return round(sps * (1 << T_FRAC))
+
+
+def sps_effective(word):
+    """What the hardware uses for an sps register value: 0 (never written) is 2.0, clamped to 2.0 - 8.0."""
+    if word == 0:
+        return SPS_MIN
+    return SPS_MIN if word < SPS_MIN else SPS_MAX if word > SPS_MAX else word
+
+
 def _rshift_round(v, s):
     return (v + (1 << (s - 1))) >> s if s > 0 else v
 
@@ -116,7 +134,7 @@ def _clamp(v, lo, hi):
 
 
 class SymFrontModel:
-    def __init__(self, nco_step_word=0, kp=None, ki=None):
+    def __init__(self, nco_step_word=0, kp=None, ki=None, sps=0):
         self.cos, self.sin = nco_table()
         self.bank = interp_bank()
         self.inv = inv_table()
@@ -125,6 +143,7 @@ class SymFrontModel:
         if kp is None:
             kp, ki = loop_gains(0.02)
         self.kp, self.ki = kp, ki
+        self.sps = sps_effective(sps)
         self.reset()
 
     def reset(self):
@@ -133,7 +152,7 @@ class SymFrontModel:
         self.hist = []          # mixed samples, absolute index = self.base + position
         self.base = 0
         self.n = -1             # index of the newest sample
-        self.t = (TAPS // 2 + 1) << T_FRAC   # first instant: enough history for the m window
+        self.t = ((TAPS // 2) << T_FRAC) + (self.sps >> 1)   # first instant: enough history for the m window (5.0 at 2 samples per symbol)
         self.integ = 0
         self.corr = 0
         self.corr_prev = 0
@@ -165,20 +184,28 @@ class SymFrontModel:
             ti += 1
         h = self.bank[p]
         s0 = ti - (TAPS // 2) + 1 - self.base
-        win = self.hist[s0 - 1:s0 + TAPS]       # x[s0-1 .. s0+TAPS-1]
+        # m: half a symbol earlier, with its own phase
+        tm = self.t - (self.sps >> 1)
+        tmi = tm >> T_FRAC
+        pm = _rshift_round(tm & ((1 << T_FRAC) - 1), T_FRAC - 9)
+        if pm >= PHASES:
+            pm = 0
+            tmi += 1
+        hm = self.bank[pm]
+        s0m = tmi - (TAPS // 2) + 1 - self.base
         yr = yi = mr = mi = 0
         for j in range(TAPS):
-            hr = h[j]
-            yr += hr * win[j + 1][0]
-            yi += hr * win[j + 1][1]
-            mr += hr * win[j][0]
-            mi += hr * win[j][1]
+            yr += h[j] * self.hist[s0 + j][0]
+            yi += h[j] * self.hist[s0 + j][1]
+            mr += hm[j] * self.hist[s0m + j][0]
+            mi += hm[j] * self.hist[s0m + j][1]
         yr = _clamp(_rshift_round(yr, COEF_FRAC), -32768, 32767)
         yi = _clamp(_rshift_round(yi, COEF_FRAC), -32768, 32767)
         mr = _clamp(_rshift_round(mr, COEF_FRAC), -32768, 32767)
         mi = _clamp(_rshift_round(mi, COEF_FRAC), -32768, 32767)
         # next instant from the correction known so far (the one of the previous symbol)
-        self.t += (2 << T_FRAC) - (self.corr_prev >> (CORR_FRAC - T_FRAC - 1))
+        cq = _clamp(self.corr_prev >> (CORR_FRAC - T_FRAC), -CQ_MAX, CQ_MAX)
+        self.t += self.sps - ((cq * self.sps) >> T_FRAC)
         # power and AGC
         pw = yr * yr + yi * yi
         sh = 4 if self.count < 64 else 8 if self.count < 1024 else 12
@@ -216,7 +243,7 @@ class SymFrontModel:
             self.n += 1
             while (self.t >> T_FRAC) + TAPS // 2 + 1 <= self.n:
                 self._symbol(out)
-            drop = (self.t >> T_FRAC) - TAPS - self.base
+            drop = (self.t >> T_FRAC) - TAPS - 8 - self.base
             if drop > 4096:
                 del self.hist[:drop]
                 self.base += drop

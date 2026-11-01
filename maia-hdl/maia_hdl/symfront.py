@@ -5,8 +5,8 @@
 #
 """DVB-S2 symbol front end (SymFront).
 
-Takes the AD936x samples after the radio's RRC FIR (about 2 samples per
-symbol) and outputs one timing-recovered symbol per symbol at unit mean
+Takes matched-filtered samples (the radio's RRC FIR, or an RRC in the Maia
+DDC) at 2 - 8 samples per symbol (sps register) and outputs one timing-recovered symbol per symbol at unit mean
 power, so that zynqrx can skip its mixer and symbol timer (``--symbols``).
 
 Bit-exact with :mod:`maia_hdl.symfront_model`, which documents the
@@ -51,6 +51,10 @@ class SymFront(Elaboratable):
         Phase increment, :func:`symfront_model.nco_step`.
     kp, ki : Signal(24), in
         Loop gains, :func:`symfront_model.loop_gains`.
+    sps : Signal(32), in
+        Samples per symbol, Q24 (:func:`symfront_model.sps_word`), 2.0 - 8.0;
+        0 means 2.0, other values are clamped (:func:`symfront_model.sps_effective`).
+        Read at the first symbol after reset for the starting instant.
     i_out, q_out : Signal(signed(16)), out
         Symbols, unit power = 512, 12-bit range.
     out_valid : Signal(), out
@@ -67,6 +71,7 @@ class SymFront(Elaboratable):
         self.nco_step = Signal(32)
         self.kp = Signal(24)
         self.ki = Signal(24)
+        self.sps = Signal(32)
         self.i_out = Signal(signed(16))
         self.q_out = Signal(signed(16))
         self.out_valid = Signal()
@@ -74,7 +79,7 @@ class SymFront(Elaboratable):
 
     def ports(self):
         return [self.i_in, self.q_in, self.in_valid, self.nco_step,
-                self.kp, self.ki, self.i_out, self.q_out, self.out_valid,
+                self.kp, self.ki, self.sps, self.i_out, self.q_out, self.out_valid,
                 self.power]
 
     def elaborate(self, platform):
@@ -140,17 +145,43 @@ class SymFront(Elaboratable):
 
         # ---------------------------------------------------------------- symbol engine
         TF = M.T_FRAC
+        # samples per symbol (Q24), 0 = 2.0, clamped to 2.0 - 8.0; registered
+        sps = Signal(28)
+        m.d.sync += sps.eq(Mux(self.sps == 0, M.SPS_MIN,
+                               Mux(self.sps < M.SPS_MIN, M.SPS_MIN,
+                                   Mux(self.sps > M.SPS_MAX, M.SPS_MAX, self.sps))))
+        half = Signal(27)
+        m.d.comb += half.eq(sps >> 1)
+        started = Signal()          # the first instant is set from sps
+        sps_ok = Signal()           # sps is registered: valid one cycle after reset
+        m.d.sync += sps_ok.eq(1)
         t = Signal(16 + TF, init=(M.TAPS // 2 + 1) << TF)
         t_int = t[TF:]
+        tm = Signal(16 + TF)        # the m instant, half a symbol earlier
+        m.d.comb += tm.eq(t - half)
         corr = Signal(signed(58))
         integ = Signal(signed(58))
+        cq = Signal(signed(TF + 2))         # correction, Q24, clamped to +-2
+        prod = Signal(signed(TF + 2 + 28))
+        dt = Signal(signed(TF + 2 + 28 - TF))
         p_idx = Signal(10)
+        pm_idx = Signal(10)
         ti = Signal(16)
+        tmi = Signal(16)
         j = Signal(4)
         m.submodules.bank = bank_mem = Memory(
             shape=signed(16), depth=M.PHASES * M.TAPS,
             init=[c for row in bank for c in row])
         rb = bank_mem.read_port()
+        rbm = bank_mem.read_port()
+        # timing step: sps * corr, the correction in Q24 clamped to +-2, pipelined (free running)
+        cs = Signal(signed(58 - (M.CORR_FRAC - TF)))
+        m.d.comb += cs.eq(corr >> (M.CORR_FRAC - TF))
+        m.d.sync += [
+            cq.eq(Mux(cs > M.CQ_MAX, M.CQ_MAX, Mux(cs < -M.CQ_MAX, -M.CQ_MAX, cs))),
+            prod.eq(cq * sps),
+            dt.eq(prod >> TF),
+        ]
         acc_yr = Signal(signed(36))
         acc_yi = Signal(signed(36))
         acc_mr = Signal(signed(36))
@@ -188,18 +219,23 @@ class SymFront(Elaboratable):
         m.d.comb += newest_minus.eq(n_cnt - 1 - t_int - (M.TAPS // 2 + 1))
 
         s0 = Signal(16)
+        s0m = Signal(16)
         m.d.comb += [
             s0.eq(ti - (M.TAPS // 2) + 1),
+            s0m.eq(tmi - (M.TAPS // 2) + 1),
             rb.addr.eq(Cat(j[:3], p_idx[:9])),
+            rbm.addr.eq(Cat(j[:3], pm_idx[:9])),
         ]
-        # samples of tap j: y window x[s0 + j], m window x[s0 - 1 + j]
+        # samples of tap j: y window x[s0 + j], m window x[s0m + j] (own phase)
+        cm = Signal(signed(16))
+        m.d.comb += cm.eq(rbm.data)
         m.d.sync += mac_en.eq(0)
         with m.If(mac_en):
             m.d.sync += [
                 acc_yr.eq(acc_yr + rb.data * sy_re),
                 acc_yi.eq(acc_yi + rb.data * sy_im),
-                acc_mr.eq(acc_mr + rb.data * sm_re),
-                acc_mi.eq(acc_mi + rb.data * sm_im),
+                acc_mr.eq(acc_mr + cm * sm_re),
+                acc_mi.eq(acc_mi + cm * sm_im),
             ]
 
         # exponent of the power: position of its leading one
@@ -234,14 +270,19 @@ class SymFront(Elaboratable):
         m.d.sync += self.out_valid.eq(0)
         with m.FSM():
             with m.State('IDLE'):
-                with m.If(newest_minus >= 0):
-                    # fractional phase rounded to 9 bits; a carry moves to the next sample
+                with m.If(~started):
+                    # first instant: room for the m window (5.0 at 2 samples per symbol)
+                    with m.If(sps_ok):
+                        m.d.sync += [t.eq(((M.TAPS // 2) << TF) + half), started.eq(1)]
+                with m.Elif(newest_minus >= 0):
+                    # fractional phases rounded to 9 bits; a carry moves to the next sample
                     p_full = (t[:TF] + (1 << (TF - 10))) >> (TF - 9)
+                    pm_full = (tm[:TF] + (1 << (TF - 10))) >> (TF - 9)
                     m.d.sync += [
                         p_idx.eq(p_full[:9]),
                         ti.eq(t_int + p_full[9]),
-                        # next instant, from the correction of the previous symbol
-                        t.eq(t + (2 << TF) - (corr >> (M.CORR_FRAC - TF - 1))),
+                        pm_idx.eq(pm_full[:9]),
+                        tmi.eq(tm[TF:] + pm_full[9]),
                         j.eq(0),
                         acc_yr.eq(0), acc_yi.eq(0), acc_mr.eq(0), acc_mi.eq(0),
                     ]
@@ -251,8 +292,8 @@ class SymFront(Elaboratable):
                 m.d.sync += [
                     sy_re.eq(ring_re[(s0 + j)[:5]]),
                     sy_im.eq(ring_im[(s0 + j)[:5]]),
-                    sm_re.eq(ring_re[(s0 + j - 1)[:5]]),
-                    sm_im.eq(ring_im[(s0 + j - 1)[:5]]),
+                    sm_re.eq(ring_re[(s0m + j)[:5]]),
+                    sm_im.eq(ring_im[(s0m + j)[:5]]),
                     mac_en.eq(1),
                     j.eq(j + 1),
                 ]
@@ -262,6 +303,9 @@ class SymFront(Elaboratable):
                 m.next = 'ROUND'
             with m.State('ROUND'):
                 m.d.sync += [
+                    # next instant, from the correction of the previous symbol
+                    # (corr changes in LOOP2; dt follows it 3 cycles later, long before ROUND)
+                    t.eq(t + sps - dt),
                     yr.eq(_clamp(_round_shift(acc_yr, M.COEF_FRAC, 23), 16)),
                     yi.eq(_clamp(_round_shift(acc_yi, M.COEF_FRAC, 23), 16)),
                     mr.eq(_clamp(_round_shift(acc_mr, M.COEF_FRAC, 23), 16)),
@@ -367,6 +411,8 @@ class SymFrontIP(Elaboratable):
     0x10 power    (R) interpolator output power >> 2 (AGC level)
     0x14 symbols  (R) symbols made since enable
     0x18 status   (R) [0] input FIFO overflow, [1] output FIFO overflow (sticky until disable)
+    0x1c sps      samples per symbol of the input, Q24 (symfront_model.sps_word), 2.0 - 8.0;
+                  0 (reset value) means 2.0. Write it before enable.
     """
     def __init__(self):
         self.s_axi_lite = ClockDomain('s_axi_lite')
@@ -384,6 +430,7 @@ class SymFrontIP(Elaboratable):
                 5: Register('symbols', [Field('symbols', Access.R, 32, 0)]),
                 6: Register('status', [Field('in_overflow', Access.R, 1, 0),
                                        Field('out_overflow', Access.R, 1, 0)]),
+                7: Register('sps', [Field('sps', Access.RW, 32, 0)]),
             },
             3)
         self.re_in = Signal(signed(16))
@@ -462,6 +509,7 @@ class SymFrontIP(Elaboratable):
             core.nco_step.eq(self.registers['nco_step']['nco_step']),
             core.kp.eq(self.registers['kp']['kp']),
             core.ki.eq(self.registers['ki']['ki']),
+            core.sps.eq(self.registers['sps']['sps']),
             self.registers['power']['power'].eq(core.power[2:]),
         ]
         nsym = Signal(32)

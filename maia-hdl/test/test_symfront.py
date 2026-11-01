@@ -5,8 +5,8 @@
 #
 """SymFront against its bit-exact model (symfront_model.py).
 
-Without SYMFRONT_CS8 the input is a synthetic QPSK signal (RRC, 2 samples per
-symbol, carrier and clock offsets, noise). With SYMFRONT_CS8=<file> a
+Without SYMFRONT_CS8 the input is a synthetic QPSK signal (RRC, 2 - 4 samples
+per symbol, carrier and clock offsets, noise). With SYMFRONT_CS8=<file> a
 recording (e.g. from `zynqrx gen ... --prefiltered`) is used instead.
 """
 
@@ -36,7 +36,7 @@ def synthetic(n_sym, sps=2.0003, cfo=0.0125, snr_db=12, seed=1):
     up[::8] = sym
     x = np.convolve(up, h)
     x = np.convolve(x, h) / np.sum(h ** 2)
-    idx = np.arange(0, len(x) - 8, 4 * sps)
+    idx = np.arange(0, len(x) - 8, 8 / sps)   # x has 8 points per symbol
     y = np.interp(idx, np.arange(len(x)), x.real) + 1j * np.interp(idx, np.arange(len(x)), x.imag)
     y = y * np.exp(2j * np.pi * cfo * np.arange(len(y)))
     y += (rng.standard_normal(len(y)) + 1j * rng.standard_normal(len(y))) * 10 ** (-snr_db / 20) / 2
@@ -49,6 +49,15 @@ class TestSymFront(AmaranthSim):
         self.dut = SymFront()
 
     def test_against_model(self):
+        self.run_model_check(0)
+
+    def test_sps_2667(self):
+        self.run_model_check(M.sps_word(8 / 3), 8 / 3 * 1.00015)
+
+    def test_sps_4(self):
+        self.run_model_check(M.sps_word(4.0), 4.0006)
+
+    def run_model_check(self, sps_reg, sps_signal=2.0003):
         path = os.environ.get('SYMFRONT_CS8')
         if path:
             raw = np.fromfile(path, dtype=np.int8).astype(int) * 16
@@ -56,11 +65,11 @@ class TestSymFront(AmaranthSim):
             x = list(zip(raw[0:2 * n:2].tolist(), raw[1:2 * n:2].tolist()))
             cfo = float(os.environ.get('SYMFRONT_CFO', '0')) / float(os.environ.get('SYMFRONT_FS', '2e6'))
         else:
-            x = synthetic(6000)
-            cfo = 0.0125
+            x = synthetic(6000 if sps_reg == 0 else 3000, sps=sps_signal)
+            cfo = 0.0125 * 2 / sps_signal
         step = M.nco_step(cfo, 1.0)
         kp, ki = M.loop_gains(0.02)
-        model = M.SymFrontModel(step, kp, ki)
+        model = M.SymFrontModel(step, kp, ki, sps_reg)
         expected = model.process(x)
         got = []
         done = []
@@ -69,6 +78,7 @@ class TestSymFront(AmaranthSim):
             ctx.set(self.dut.nco_step, step)
             ctx.set(self.dut.kp, kp)
             ctx.set(self.dut.ki, ki)
+            ctx.set(self.dut.sps, sps_reg)
             gap = 9
             for (r, i) in x:
                 ctx.set(self.dut.i_in, r)
@@ -90,7 +100,8 @@ class TestSymFront(AmaranthSim):
 
         self.simulate([drive, collect])
         n = min(len(got), len(expected))
-        self.assertGreater(n, len(x) // 2 - 20)
+        sps_eff = M.sps_effective(sps_reg) / (1 << M.T_FRAC)
+        self.assertGreater(n, len(x) / sps_eff - 20)
         mism = [k for k in range(n) if got[k] != expected[k]]
         self.assertEqual(mism[:5], [], f'{len(mism)} of {n} symbols differ')
 
