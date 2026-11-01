@@ -391,6 +391,123 @@ class SymFront(Elaboratable):
         return m
 
 
+class SymCarrier(Elaboratable):
+    """Carrier stage: decision-directed second-order PLL at the symbol rate.
+
+    Bit-exact with :class:`symfront_model.CarrierModel` (which documents the
+    arithmetic). Symbols come with ``in_valid`` at least 8 clock cycles apart.
+    ``mode`` 0 bypasses (``i_out = i_in``, one cycle later) and holds the loop
+    at zero; 1 = QPSK slicer, 2 = 8PSK slicer.
+
+    Attributes
+    ----------
+    i_in, q_in : Signal(signed(16)), in
+        Symbols (unit power = 512, 12-bit range).
+    in_valid : Signal(), in
+    mode : Signal(2), in
+    kp, ki : Signal(32), in
+        :func:`symfront_model.carrier_gains`.
+    i_out, q_out : Signal(signed(16)), out
+    out_valid : Signal(), out
+    freq : Signal(signed(32)), out
+        Loop frequency, P units (2**32 = 2 pi) per symbol.
+    """
+    def __init__(self):
+        self.i_in = Signal(signed(16))
+        self.q_in = Signal(signed(16))
+        self.in_valid = Signal()
+        self.mode = Signal(2)
+        self.kp = Signal(32)
+        self.ki = Signal(32)
+        self.i_out = Signal(signed(16))
+        self.q_out = Signal(signed(16))
+        self.out_valid = Signal()
+        self.freq = Signal(signed(32))
+
+    def ports(self):
+        return [self.i_in, self.q_in, self.in_valid, self.mode, self.kp,
+                self.ki, self.i_out, self.q_out, self.out_valid, self.freq]
+
+    def elaborate(self, platform):
+        m = Module()
+        cos_t, sin_t = M.nco_table()
+        m.submodules.lut_cos = lut_cos = Memory(
+            shape=signed(16), depth=1 << M.LUT_BITS, init=cos_t)
+        m.submodules.lut_sin = lut_sin = Memory(
+            shape=signed(16), depth=1 << M.LUT_BITS, init=sin_t)
+        rc = lut_cos.read_port()
+        rs = lut_sin.read_port()
+        p = Signal(32)
+        f = Signal(signed(48))
+        m.d.comb += [rc.addr.eq(p[32 - M.LUT_BITS:]),
+                     rs.addr.eq(p[32 - M.LUT_BITS:]),
+                     self.freq.eq(f >> 16)]
+        xr = Signal(signed(16))
+        xi = Signal(signed(16))
+        p1 = Signal(signed(32))
+        p2 = Signal(signed(32))
+        p3 = Signal(signed(32))
+        p4 = Signal(signed(32))
+        yr = Signal(signed(16))
+        yi = Signal(signed(16))
+        e_raw = Signal(signed(34))
+        e = Signal(signed(18))
+        kpe = Signal(signed(51))
+        kie = Signal(signed(51))
+        lim = 1 << (M.OUT_BITS - 1)
+
+        # slicer (combinational on yr, yi)
+        ar = Signal(16)
+        ai = Signal(16)
+        cr = Signal(signed(17))
+        ci = Signal(signed(17))
+        m.d.comb += [ar.eq(Mux(yr < 0, -yr, yr)), ai.eq(Mux(yi < 0, -yi, yi))]
+        sr_a = Mux(yr >= 0, M.CAR_A, -M.CAR_A)
+        si_a = Mux(yi >= 0, M.CAR_A, -M.CAR_A)
+        with m.If((self.mode == M.CAR_8PSK) & ((ai << 15) < M.CAR_T * ar)):
+            m.d.comb += [cr.eq(Mux(yr >= 0, 32767, -32767)), ci.eq(0)]
+        with m.Elif((self.mode == M.CAR_8PSK) & ((ar << 15) < M.CAR_T * ai)):
+            m.d.comb += [cr.eq(0), ci.eq(Mux(yi >= 0, 32767, -32767))]
+        with m.Else():
+            m.d.comb += [cr.eq(sr_a), ci.eq(si_a)]
+
+        m.d.sync += self.out_valid.eq(0)
+        with m.FSM():
+            with m.State('IDLE'):
+                with m.If(self.in_valid):
+                    with m.If(self.mode == M.CAR_OFF):
+                        m.d.sync += [self.i_out.eq(self.i_in), self.q_out.eq(self.q_in),
+                                     self.out_valid.eq(1), p.eq(0), f.eq(0)]
+                    with m.Else():
+                        # the tables hold the value for p from this cycle on
+                        m.d.sync += [xr.eq(self.i_in), xi.eq(self.q_in)]
+                        m.next = 'MUL'
+            with m.State('MUL'):
+                m.d.sync += [p1.eq(xr * rc.data), p2.eq(xi * rs.data),
+                             p3.eq(xi * rc.data), p4.eq(xr * rs.data)]
+                m.next = 'ROT'
+            with m.State('ROT'):
+                m.d.sync += [yr.eq(_clamp(_round_shift(p1 + p2, 15, 18), M.OUT_BITS)),
+                             yi.eq(_clamp(_round_shift(p3 - p4, 15, 18), M.OUT_BITS))]
+                m.next = 'ERR'
+            with m.State('ERR'):
+                m.d.sync += [e_raw.eq(yi * cr - yr * ci),
+                             self.i_out.eq(yr), self.q_out.eq(yi), self.out_valid.eq(1)]
+                m.next = 'CLAMP'
+            with m.State('CLAMP'):
+                es = e_raw >> 8
+                m.d.sync += e.eq(Mux(es > M.CAR_EMAX, M.CAR_EMAX, Mux(es < -M.CAR_EMAX, -M.CAR_EMAX, es)))
+                m.next = 'GAIN'
+            with m.State('GAIN'):
+                m.d.sync += [kpe.eq(self.kp * e), kie.eq(self.ki * e)]
+                m.next = 'STEP'
+            with m.State('STEP'):
+                m.d.sync += [p.eq(p + (f >> 16) + (kpe >> M.CAR_KP_SHIFT)),
+                             f.eq(f + (kie >> M.CAR_KI_SHIFT))]
+                m.next = 'IDLE'
+        return m
+
+
 class SymFrontIP(Elaboratable):
     """SymFront as a Vivado IP core, inserted in the RX sample path.
 
@@ -413,12 +530,16 @@ class SymFrontIP(Elaboratable):
     0x18 status   (R) [0] input FIFO overflow, [1] output FIFO overflow (sticky until disable)
     0x1c sps      samples per symbol of the input, Q24 (symfront_model.sps_word), 2.0 - 8.0;
                   0 (reset value) means 2.0. Write it before enable.
+    0x20 cmode    carrier stage: 0 off (bypass, the reset value), 1 QPSK, 2 8PSK slicer
+    0x24 ckp      carrier loop gain (kp + ki), symfront_model.carrier_gains
+    0x28 cki      carrier loop integral gain
+    0x2c cfreq    (R) carrier loop frequency, 2**32 = 2 pi per symbol (signed)
     """
     def __init__(self):
         self.s_axi_lite = ClockDomain('s_axi_lite')
         self.iq = ClockDomain('iq')
         self.proc = ClockDomain('proc')
-        self.axi4lite = Axi4LiteRegisterBridge(3, name='s_axi_lite')
+        self.axi4lite = Axi4LiteRegisterBridge(4, name='s_axi_lite')
         self.registers = Registers(
             'symfront',
             {
@@ -431,8 +552,12 @@ class SymFrontIP(Elaboratable):
                 6: Register('status', [Field('in_overflow', Access.R, 1, 0),
                                        Field('out_overflow', Access.R, 1, 0)]),
                 7: Register('sps', [Field('sps', Access.RW, 32, 0)]),
+                8: Register('cmode', [Field('cmode', Access.RW, 2, 0)]),
+                9: Register('ckp', [Field('ckp', Access.RW, 32, 0)]),
+                10: Register('cki', [Field('cki', Access.RW, 32, 0)]),
+                11: Register('cfreq', [Field('cfreq', Access.R, 32, 0)]),
             },
-            3)
+            4)
         self.re_in = Signal(signed(16))
         self.im_in = Signal(signed(16))
         self.strobe_in = Signal()
@@ -519,17 +644,31 @@ class SymFrontIP(Elaboratable):
             m.d.proc += nsym.eq(nsym + 1)
         m.d.comb += self.registers['symbols']['symbols'].eq(nsym)
 
+        # carrier stage (bypassed while cmode = 0), reset with the core
+        car = SymCarrier()
+        m.submodules.car = car = DomainRenamer({'sync': 'proc'})(
+            ResetInserter(~enable)(car))
+        m.d.comb += [
+            car.i_in.eq(core.i_out),
+            car.q_in.eq(core.q_out),
+            car.in_valid.eq(core.out_valid),
+            car.mode.eq(self.registers['cmode']['cmode']),
+            car.kp.eq(self.registers['ckp']['ckp']),
+            car.ki.eq(self.registers['cki']['cki']),
+            self.registers['cfreq']['cfreq'].eq(car.freq),
+        ]
+
         # symbols proc -> iq
         m.submodules.fifo_out = fifo_out = AsyncFIFO(
             width=32, depth=16, r_domain='iq', w_domain='proc')
         m.d.comb += [
-            fifo_out.w_data.eq(Cat(core.i_out, core.q_out)),
-            fifo_out.w_en.eq(core.out_valid),
+            fifo_out.w_data.eq(Cat(car.i_out, car.q_out)),
+            fifo_out.w_en.eq(car.out_valid),
         ]
         out_ovf = Signal()
         with m.If(~enable):
             m.d.proc += out_ovf.eq(0)
-        with m.Elif(core.out_valid & ~fifo_out.w_rdy):
+        with m.Elif(car.out_valid & ~fifo_out.w_rdy):
             m.d.proc += out_ovf.eq(1)
         in_ovf = Signal()
         m.submodules.ovf_sync = FFSynchronizer(in_ovf_iq, in_ovf, o_domain='proc')

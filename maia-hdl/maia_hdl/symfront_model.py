@@ -248,3 +248,84 @@ class SymFrontModel:
                 del self.hist[:drop]
                 self.base += drop
         return out
+
+
+# ---------------------------------------------------------------------------
+# Carrier stage (after the AGC, one step per symbol)
+#
+# A decision-directed second-order PLL on the timing-recovered symbols, with the
+# loop structure of zynqrx's data loop (S2Rx fastRun): the phase advances by the
+# old frequency plus (kp + ki) * e, then the frequency integrates ki * e. The PL
+# scrambling of DVB-S2 and the pi/2-BPSK headers and pilots only rotate by
+# multiples of 90 degrees, so the loop runs without knowing the frames (QPSK and
+# 8PSK slicers; the receiver resolves the 90 / 45 degree ambiguity per frame).
+#
+#   phase P: 32 bits, 2**32 = 2 pi.  frequency F: signed, Q16 of P units per symbol.
+#   y = x * exp(-j P) through the nco_table (index P >> 22), rounded, 12-bit clamp.
+#   e = Im(y conj(c)) for the nearest constellation point c (Q15), in Q16 radians
+#       (a unit-power symbol), clamped to +-0.5 rad.
+#   P += (F >> 16) + ((kp * e) >> 20);  F += (ki * e) >> 8
+#   kp register: P units per radian in Q4 (carrier_gains); ki: Q16 P units per radian in Q8.
+
+CAR_OFF, CAR_QPSK, CAR_8PSK = 0, 1, 2
+CAR_A = 23170              # cos(45 deg), Q15
+CAR_T = 13573              # tan(22.5 deg), Q15
+CAR_EMAX = 1 << 15         # 0.5 rad in Q16
+CAR_KP_SHIFT = 20
+CAR_KI_SHIFT = 8
+
+
+def carrier_gains(bnt, zeta=2.0):
+    """kp, ki registers for a loop noise bandwidth bnt (x symbol period), as zynqrx's S2Rx::gains (kp register = kp + ki)."""
+    th = bnt / (zeta + 1.0 / (4.0 * zeta))
+    d = 1.0 + 2.0 * zeta * th + th * th
+    kp = 4.0 * zeta * th / d
+    ki = 4.0 * th * th / d
+    unit = (1 << NCO_BITS) / (2 * math.pi)       # P units per radian
+    return round((kp + ki) * unit * (1 << (CAR_KP_SHIFT - 16))), round(ki * unit * (1 << (16 - 16 + CAR_KI_SHIFT)))
+
+
+def carrier_ref(yr, yi, mode):
+    """Nearest constellation point (Q15) for the decision-directed error."""
+    sr = 1 if yr >= 0 else -1
+    si = 1 if yi >= 0 else -1
+    if mode == CAR_8PSK:
+        ar, ai = abs(yr), abs(yi)
+        if ai * 32768 < CAR_T * ar:
+            return sr * 32767, 0
+        if ar * 32768 < CAR_T * ai:
+            return 0, si * 32767
+    return sr * CAR_A, si * CAR_A
+
+
+class CarrierModel:
+    def __init__(self, mode=CAR_OFF, kp=0, ki=0):
+        self.cos, self.sin = nco_table()
+        self.mode, self.kp, self.ki = mode, kp, ki
+        self.reset()
+
+    def reset(self):
+        self.p = 0
+        self.f = 0
+
+    def freq(self):
+        """Loop frequency readout: P units per symbol (signed)."""
+        return self.f >> 16
+
+    def step(self, xr, xi):
+        if self.mode == CAR_OFF:
+            self.p = self.f = 0          # held at zero while bypassed
+            return xr, xi
+        idx = self.p >> (NCO_BITS - LUT_BITS)
+        c, s = self.cos[idx], self.sin[idx]
+        lim = 1 << (OUT_BITS - 1)
+        yr = _clamp(_rshift_round(xr * c + xi * s, 15), -lim, lim - 1)
+        yi = _clamp(_rshift_round(xi * c - xr * s, 15), -lim, lim - 1)
+        cr, ci = carrier_ref(yr, yi, self.mode)
+        e = _clamp((yi * cr - yr * ci) >> 8, -CAR_EMAX, CAR_EMAX)
+        self.p = (self.p + (self.f >> 16) + ((self.kp * e) >> CAR_KP_SHIFT)) & ((1 << NCO_BITS) - 1)
+        self.f += (self.ki * e) >> CAR_KI_SHIFT
+        return yr, yi
+
+    def process(self, symbols):
+        return [self.step(r, i) for r, i in symbols]
