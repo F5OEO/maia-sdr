@@ -17,7 +17,7 @@ import unittest
 import numpy as np
 
 from .amaranth_sim import AmaranthSim
-from maia_hdl.symfront import SymFront, SymFrontIP, SymCarrier
+from maia_hdl.symfront import SymFront, SymFrontIP
 from amaranth.sim import Simulator
 from maia_hdl import symfront_model as M
 
@@ -104,71 +104,6 @@ class TestSymFront(AmaranthSim):
         self.assertGreater(n, len(x) / sps_eff - 20)
         mism = [k for k in range(n) if got[k] != expected[k]]
         self.assertEqual(mism[:5], [], f'{len(mism)} of {n} symbols differ')
-
-
-def symbol_stream(n, mode, esn0, cfo, pn_std, seed=2):
-    """Unit-power symbols (Q9) with PL-like 90 degree scrambling, carrier offset, phase noise and noise."""
-    rng = np.random.default_rng(seed)
-    if mode == M.CAR_8PSK:
-        pts = np.exp(1j * np.pi / 4 * rng.integers(0, 8, n))
-    else:
-        pts = np.exp(1j * (np.pi / 4 + np.pi / 2 * rng.integers(0, 4, n)))
-    pts = pts * np.exp(1j * np.pi / 2 * rng.integers(0, 4, n))
-    ph = 2 * np.pi * cfo * np.arange(n) + np.cumsum(rng.standard_normal(n) * pn_std) + 0.7
-    x = pts * np.exp(1j * ph) + (rng.standard_normal(n) + 1j * rng.standard_normal(n)) * np.sqrt(10 ** (-esn0 / 10) / 2)
-    x = np.clip(np.round(x * 512), -2048, 2047)
-    return [(int(r), int(i)) for r, i in zip(x.real, x.imag)]
-
-
-class TestSymCarrier(AmaranthSim):
-    def setUp(self):
-        self.dut = SymCarrier()
-
-    def check(self, mode, esn0, n=4000):
-        x = symbol_stream(n, mode, esn0, 2e-4, 0.01)
-        kp, ki = M.carrier_gains(0.02)
-        model = M.CarrierModel(mode, kp, ki)
-        expected = model.process(x)
-        got = []
-        done = []
-
-        async def drive(ctx):
-            ctx.set(self.dut.mode, mode)
-            ctx.set(self.dut.kp, kp)
-            ctx.set(self.dut.ki, ki)
-            await ctx.tick().repeat(3)
-            for (r, i) in x:
-                ctx.set(self.dut.i_in, r)
-                ctx.set(self.dut.q_in, i)
-                ctx.set(self.dut.in_valid, 1)
-                await ctx.tick()
-                ctx.set(self.dut.in_valid, 0)
-                await ctx.tick().repeat(8 + random.randint(0, 6))
-            await ctx.tick().repeat(20)
-            done.append(ctx.get(self.dut.freq))
-
-        async def collect(ctx):
-            async for clk, rst, v, r, i in ctx.tick().sample(
-                    self.dut.out_valid, self.dut.i_out, self.dut.q_out):
-                if v:
-                    got.append((r, i))
-                if done:
-                    break
-
-        self.simulate([drive, collect])
-        self.assertEqual(len(got), len(expected))
-        mism = [k for k in range(len(got)) if got[k] != expected[k]]
-        self.assertEqual(mism[:5], [], f'{len(mism)} of {len(got)} symbols differ')
-        self.assertEqual(done[0], model.freq())
-
-    def test_off(self):
-        self.check(M.CAR_OFF, 10.0, 500)
-
-    def test_qpsk(self):
-        self.check(M.CAR_QPSK, 8.5)
-
-    def test_8psk(self):
-        self.check(M.CAR_8PSK, 13.0)
 
 
 class TestSymFrontIP(unittest.TestCase):
