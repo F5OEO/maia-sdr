@@ -55,6 +55,7 @@ switch -glob -- $project_name {
         set vctcxo "vctcxo"
         set txfir "txfir"
         set i2c1emio "i2c1emio"
+        set symfront "symfront"
         #set sync "sync"
         #set iqburst "iqburst"
 
@@ -103,6 +104,7 @@ if {[info exists fftraw]} {
 if {[info exists vctcxo]} { source $::tezuka_hdl_dir/boards/$project_name/vcxo_ctrl.tcl }
 source $::tezuka_hdl_dir/common/sweeper.tcl
 source $::tezuka_hdl_dir/common/cs12_cs8.tcl
+if {[info exists symfront]} { source $::tezuka_hdl_dir/common/symfront.tcl }
 if {[info exists uartlite]} { source $::tezuka_hdl_dir/common/uartlite.tcl }
 if {[info exists uart16550]} { source $::tezuka_hdl_dir/common/uart16550.tcl }
 if {[info exists txfir]} { source $::tezuka_hdl_dir/common/txfir.tcl }
