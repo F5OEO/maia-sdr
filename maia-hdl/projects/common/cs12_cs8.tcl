@@ -38,7 +38,7 @@ ad_connect cs12_8mux_chan0/clk util_ad9361_adc_fifo/dout_clk
 ad_connect cs12_8mux_chan0/rst_n util_ad9361_adc_fifo/dout_rstn
 ad_connect cs12_zero_count_slice/Dout cs12_8mux_chan0/zero_count
 
-# Outputs (data routed through cs12_sync_frame: inserts a CS12 sync burst every period)
+# Outputs (data routed through cs12_sync_frame: replaces one CS12 burst with a sync burst every period)
 create_bd_cell -type module -reference cs12_sync_frame cs12_sync_chan0
 ad_connect cs12_sync_chan0/clk           util_ad9361_adc_fifo/dout_clk
 ad_connect cs12_sync_chan0/rst_n         util_ad9361_adc_fifo/dout_rstn
@@ -69,7 +69,7 @@ ad_connect cs12_8mux_chan1/clk util_ad9361_adc_fifo/dout_clk
 ad_connect cs12_8mux_chan1/rst_n util_ad9361_adc_fifo/dout_rstn
 ad_connect cs12_zero_count_slice/Dout cs12_8mux_chan1/zero_count
 
-# Outputs (data routed through cs12_sync_frame: inserts a CS12 sync burst every period)
+# Outputs (data routed through cs12_sync_frame: replaces one CS12 burst with a sync burst every period)
 create_bd_cell -type module -reference cs12_sync_frame cs12_sync_chan1
 ad_connect cs12_sync_chan1/clk           util_ad9361_adc_fifo/dout_clk
 ad_connect cs12_sync_chan1/rst_n         util_ad9361_adc_fifo/dout_rstn
