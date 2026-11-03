@@ -21,8 +21,9 @@ LIB_DEPS += axi_dmac
 LIB_DEPS += util_pack/util_cpack2
 LIB_DEPS += util_pack/util_upack2
 
-#DEST = ../../../../tezuka_fw/board/tezuka/$(PROJECT_NAME)/bitstream
-DEST = /media/hp-z2-dev/Variste/Doc/prog/tezuka_fw/board/tezuka/$(PROJECT_NAME)/bitstream
+# Where `make install` puts the bitstream. Override it for another checkout,
+# e.g. make all PROJECT_NAME=pluto DEST=../../../../tezuka_fw/board/tezuka/pluto/bitstream
+DEST ?= /media/hp-z2-dev/Variste/Doc/prog/tezuka_fw/board/tezuka/$(PROJECT_NAME)/bitstream
 include ../../adi-hdl/projects/scripts/project-xilinx.mk
 
 build_project: $(PROJECT_NAME).xpr
@@ -35,8 +36,11 @@ clean:
 	bash -c "rm -f *.log *.jou *.str *.xpr *.xsa"
 	@echo "Local project cleaned. IP cores preserved."
 
+# Next to the .xsa, install a one-line .version file recording which maia-sdr
+# commit (with -dirty for uncommitted changes) and Vivado version built it.
 install:
 	bash -c "mkdir -p $(DEST) && cp -f $(PROJECT_NAME).sdk/system_top.xsa $(DEST)/$(notdir $(CURDIR)).xsa"
+	echo "maia-sdr $$(git describe --always --dirty --abbrev=10) $(PROJECT_NAME) vivado $$(vivado -version | head -1 | cut -d' ' -f2)" > $(DEST)/$(notdir $(CURDIR)).version
 # FSBL will be done with embeddedsw later by buildroot 	
 #	bash -c "rm -rf build"
 #	bash -c "xsct create_fsbl_project.tcl $(PROJECT_NAME)"
