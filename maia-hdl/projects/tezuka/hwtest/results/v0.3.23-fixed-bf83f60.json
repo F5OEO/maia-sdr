@@ -1,0 +1,122 @@
+{
+ "label": "v0.3.23-fixed-bf83f60",
+ "time": "2026-10-11 07:14:33",
+ "board": [
+  "plutoplus",
+  "#1 SMP PREEMPT Sun Oct 11 06:48:16 CEST 2026",
+  "2e21d04bc55ea61298ee8e16b76563d6  /boot/system_top.bin",
+  "ba5c7f5c8f9f5e2175baa0fc51679cba  /boot/devicetree.dtb",
+  "9646c9c8cd6ba59067866a45b5761464  /boot/uramdisk.image.xz"
+ ],
+ "F4_waterfall_profile": {
+  "frames": 48,
+  "frame_period_s": 0.1364,
+  "profiles_seen": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "first_32": [
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "step_histogram": {
+   "1": 47
+  }
+ },
+ "F4_pads_outputs_low": [
+  "bank2 DIRM=0x00003e00 OEN=0x00003e00  EN_AGC(bit12) dir=out oe=1",
+  "samples=6500057 duration=10.0s",
+  "EN_AGC: rising_edges=0 high_fraction=0.0000 first_rise=-1.000s last_rise=-1.000s",
+  "CTRL_IN1..3 pad: transitions=74 bits_seen=0x7 histogram: 0:0.117 1:0.140 2:0.135 3:0.115 4:0.111 5:0.132 6:0.133 7:0.116"
+ ],
+ "F4_pads_restored": "bank2 DIRM=0x00002000 OEN=0x00003e00  EN_AGC(bit12) dir=in oe=1",
+ "F1": {
+  "routing_off_api": {
+   "http": "200",
+   "reg_0x790200BC": "0x00000000"
+  },
+  "cs16_routing_off": {
+   "rc": 0,
+   "bytes": 6144000,
+   "seconds": 0.12,
+   "stderr": "",
+   "msps": 12.8,
+   "nonzero": 0.741
+  },
+  "cs12_routing_off": {
+   "rc": 0,
+   "bytes": 3932160,
+   "seconds": 0.19,
+   "stderr": "",
+   "magic_count": 4,
+   "magic_gaps": [
+    744680,
+    786432
+   ],
+   "nonzero": 0.928
+  },
+  "routing_on_api": {
+   "http": "200",
+   "reg_0x790200BC": "0x00000001"
+  },
+  "cs16_routing_on": {
+   "rc": 0,
+   "bytes": 6144000,
+   "seconds": 1.11,
+   "stderr": "",
+   "msps": 1.384,
+   "nonzero": 0.702
+  },
+  "cs12_routing_on": {
+   "rc": 0,
+   "bytes": 3932160,
+   "seconds": 0.92,
+   "stderr": "",
+   "magic_count": 5,
+   "magic_gaps": [
+    786432
+   ],
+   "nonzero": 0.786
+  },
+  "restore": {
+   "http": "200",
+   "reg_0x790200BC": "0x00000000"
+  }
+ }
+}
